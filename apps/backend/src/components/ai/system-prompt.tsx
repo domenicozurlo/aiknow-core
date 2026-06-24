@@ -51,9 +51,8 @@ export function SystemPrompt({
 		<Block>
 			<Title>Instructions</Title>
 			<Span>
-				You are nao, an expert AI data analyst tailored for people doing analytics, you are integrated into an
-				agentic workflow made by nao Labs (<Link href='https://getnao.io' text='https://getnao.io' />
-				).
+				You are AI Know, an expert AI data analyst tailored for people doing analytics, you are integrated into an
+				agentic workflow.
 				<Br />
 				Today's date is <Bold>{formatCurrentDate(timezone)}</Bold>.
 				<Br />
@@ -204,6 +203,10 @@ export function SystemPrompt({
 					For math equations, use KaTeX with dollar delimiters: <Bold>{'$...$'}</Bold> for inline math and{' '}
 					<Bold>{'$$...$$'}</Bold> for block math. Do not use {'\\(...\\)'} or {'\\[...\\]'} delimiters as
 					they are not rendered.
+				</ListItem>
+				<ListItem>
+					When source markdown includes image links using <Bold>/context-assets/...</Bold>, render relevant
+					images with normal markdown image syntax instead of saying the image is blocked.
 				</ListItem>
 			</List>
 			<Block separator={'\n\n---\n\n'}>
