@@ -11,6 +11,8 @@ import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
+import dbConfig from './db/dbConfig';
+import { runMigrations } from './db/migrate';
 import { env, isCloud } from './env';
 import { AUTOMATION_JOB_NAME, automationHandler } from './handlers/automation.handler';
 import {
@@ -32,6 +34,7 @@ import { automationWebhookRoutes } from './routes/automation-webhook';
 import { brandingRoutes } from './routes/branding';
 import { chartRoutes } from './routes/chart';
 import { contextAssetRoutes } from './routes/context-assets';
+import { contextFileRoutes } from './routes/context-files';
 import { deployRoutes } from './routes/deploy';
 import { embedStoryDownloadRoutes } from './routes/embed-story-download';
 import { githubRoutes } from './routes/github';
@@ -176,6 +179,10 @@ app.register(contextAssetRoutes, {
 	prefix: '/context-assets',
 });
 
+app.register(contextFileRoutes, {
+	prefix: '/context-files',
+});
+
 app.register(brandingRoutes, {
 	prefix: '/branding',
 });
@@ -303,6 +310,8 @@ const isReservedBackendPath = (url: string) => {
 		pathname.startsWith('/i/') ||
 		pathname === '/context-assets' ||
 		pathname.startsWith('/context-assets/') ||
+		pathname === '/context-files' ||
+		pathname.startsWith('/context-files/') ||
 		pathname === '/branding' ||
 		pathname.startsWith('/branding/') ||
 		pathname === '/mcp' ||
@@ -339,6 +348,18 @@ export const startServer = async (opts: { port: number; host: string }) => {
 	if (isCloud) {
 		// TODO: Implement cloud mode
 	} else {
+		try {
+			await runMigrations({
+				dbType: dbConfig.dialect,
+				connectionString: dbConfig.dbUrl,
+				migrationsPath: dbConfig.migrationsFolder,
+			});
+		} catch (error) {
+			logger.error(`Database migrations failed: ${error instanceof Error ? error.message : String(error)}`, {
+				source: 'system',
+			});
+			throw error;
+		}
 		await ensureOrganizationSetup();
 	}
 	await logLicenseStatus();

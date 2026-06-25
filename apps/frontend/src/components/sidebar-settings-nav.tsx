@@ -104,21 +104,22 @@ const settingsNavItems: NavItem[] = [
 		to: '/settings/memory',
 		visible: ({ isViewer }) => !isViewer,
 	},
-	{
-		label: 'Enterprise',
-		type: 'divider',
-		visible: ({ isAdmin, isCloud }) => isAdmin && !isCloud,
-	},
+	// Enterprise menu intentionally hidden.
+	// {
+	// 	label: 'Enterprise',
+	// 	type: 'divider',
+	// 	visible: ({ isAdmin, isCloud }) => isAdmin && !isCloud,
+	// },
 	{
 		label: 'License',
 		to: '/settings/enterprise',
 		visible: ({ isAdmin, isCloud, hasLicense }) => isAdmin && !isCloud && hasLicense,
 	},
-	{
-		label: 'White-label',
-		to: '/settings/white-label',
-		visible: ({ isAdmin, isCloud }) => isAdmin && !isCloud,
-	},
+	// {
+	// 	label: 'White-label',
+	// 	to: '/settings/white-label',
+	// 	visible: ({ isAdmin, isCloud }) => isAdmin && !isCloud,
+	// },
 ];
 
 interface SidebarSettingsNavProps {
