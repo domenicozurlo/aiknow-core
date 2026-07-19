@@ -288,9 +288,11 @@ export interface ChartDisplayProps {
 	xAxisKey: string;
 	xAxisType: 'number' | 'category';
 	xAxisLabelFormatter?: (value: string) => string;
+	yAxisTickFormatter?: (value: number) => string;
 	series: displayChart.SeriesConfig[];
 	title?: string;
 	showGrid?: boolean;
+	fitYAxisToData?: boolean;
 }
 
 export const ChartDisplay = memo(function ChartDisplay({
@@ -299,9 +301,11 @@ export const ChartDisplay = memo(function ChartDisplay({
 	xAxisKey,
 	xAxisType,
 	xAxisLabelFormatter,
+	yAxisTickFormatter,
 	series,
 	title,
 	showGrid = true,
+	fitYAxisToData,
 }: ChartDisplayProps) {
 	const { visibleSeries, hiddenSeriesKeys, handleToggleSeriesVisibility } = useSeriesVisibility(series);
 	const dateFormat = useDateFormat();
@@ -368,8 +372,10 @@ export const ChartDisplay = memo(function ChartDisplay({
 				series: visibleSeries,
 				colorFor,
 				labelFormatter,
+				yAxisTickFormatter,
 				showGrid,
 				margin: { top: 0, right: 0, bottom: 0, left: 0 },
+				fitYAxisToData,
 				children: [
 					<ChartTooltip
 						key='tooltip'
@@ -396,7 +402,9 @@ export const ChartDisplay = memo(function ChartDisplay({
 			visibleSeries,
 			colorFor,
 			labelFormatter,
+			yAxisTickFormatter,
 			showGrid,
+			fitYAxisToData,
 			legendPayload,
 			handleToggleSeriesVisibility,
 			title,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from nao_core.config.exceptions import InitError
 from nao_core.ui import ask_text
@@ -67,6 +67,21 @@ class MysqlConfig(DatabaseConfig):
     user: str = Field(description="Username")
     password: str = Field(description="Password")
     schema_name: str | None = Field(default=None, description="Default schema (optional)")
+    ssl_mode: Literal["DISABLED", "PREFERRED", "REQUIRED", "VERIFY_CA", "VERIFY_IDENTITY"] | None = Field(
+        default=None,
+        description="MySQL SSL mode (optional). Use REQUIRED for servers that require encrypted transport.",
+    )
+    ssl_ca: str | None = Field(default=None, description="Path to SSL CA certificate file (optional)")
+    ssl_cert: str | None = Field(default=None, description="Path to SSL client certificate file (optional)")
+    ssl_key: str | None = Field(default=None, description="Path to SSL client key file (optional)")
+
+    @field_validator("ssl_mode", mode="before")
+    @classmethod
+    def _normalize_ssl_mode(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip()
+            return value.upper() if value else None
+        return value
 
     @classmethod
     def promptConfig(cls) -> "MysqlConfig":
@@ -82,6 +97,7 @@ class MysqlConfig(DatabaseConfig):
         user = ask_text("Username:", required_field=True)
         password = ask_text("Password:", password=True) or ""
         schema_name = ask_text("Default schema (optional):")
+        ssl_mode = ask_text("SSL mode (optional, e.g. REQUIRED, VERIFY_IDENTITY):") or None
 
         return MysqlConfig(
             name=name,
@@ -91,6 +107,7 @@ class MysqlConfig(DatabaseConfig):
             user=user,  # type: ignore[arg-type]
             password=password,
             schema_name=schema_name,
+            ssl_mode=ssl_mode,
         )
 
     def connect(self) -> BaseBackend:
@@ -100,13 +117,28 @@ class MysqlConfig(DatabaseConfig):
         require_database_backend("mysql")
         import ibis
 
-        return ibis.mysql.connect(
-            host=self.host,
-            port=self.port,
-            database=self.database,
-            user=self.user,
-            password=self.password,
-        )
+        kwargs: dict[str, Any] = {
+            "host": self.host,
+            "port": self.port,
+            "database": self.database,
+            "user": self.user,
+            "password": self.password,
+        }
+
+        if self.ssl_mode:
+            kwargs["ssl_mode"] = self.ssl_mode
+
+        ssl: dict[str, str] = {}
+        if self.ssl_ca:
+            ssl["ca"] = self.ssl_ca
+        if self.ssl_cert:
+            ssl["cert"] = self.ssl_cert
+        if self.ssl_key:
+            ssl["key"] = self.ssl_key
+        if ssl:
+            kwargs["ssl"] = ssl
+
+        return ibis.mysql.connect(**kwargs)
 
     def get_database_name(self) -> str:
         return self.database

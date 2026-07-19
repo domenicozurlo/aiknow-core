@@ -1,8 +1,11 @@
 import type { LlmProvider, LlmSelectedModel } from '@nao/shared/types';
 
 import { createProviderModel, getDefaultModelId, LLM_PROVIDERS, type ProviderModelResult } from '../agents/providers';
+import { env } from '../env';
+import * as projectQueries from '../queries/project.queries';
 import * as projectLlmConfigQueries from '../queries/project-llm-config.queries';
-import type { ProviderSettings } from '../types/llm';
+import type { ProviderConfigMap, ProviderSettings } from '../types/llm';
+import { extractLlmProviderOptions } from './nao-config';
 
 export { getDefaultModelId };
 
@@ -55,7 +58,7 @@ export function getDefaultEnvProvider(): LlmProvider | undefined {
 	if (hasEnvApiKey('openai')) {
 		return 'openai';
 	}
-	return undefined;
+	return getEnvProviders().at(0);
 }
 
 /** Check if a model ID is known for a provider */
@@ -112,6 +115,7 @@ export async function resolveProviderModel(
 	provider: LlmProvider,
 	modelId: string,
 ): Promise<ProviderModelResult | null> {
+	const runtimeOptions = await resolveProviderRuntimeOptions(projectId, provider);
 	const config = await projectLlmConfigQueries.getProjectLlmConfigByProvider(projectId, provider);
 	if (config) {
 		return createProviderModel(
@@ -122,6 +126,7 @@ export async function resolveProviderModel(
 				...(config.credentials && { credentials: config.credentials }),
 			},
 			modelId,
+			runtimeOptions,
 		);
 	}
 
@@ -132,14 +137,42 @@ export async function resolveProviderModel(
 			provider,
 			{ apiKey: envApiKey, ...(envBaseUrl && { baseURL: envBaseUrl }) },
 			modelId,
+			runtimeOptions,
 		);
 	}
 
 	if (hasEnvApiKey(provider)) {
-		return createProviderModel(provider, { apiKey: '' }, modelId);
+		return createProviderModel(provider, { apiKey: '' }, modelId, runtimeOptions);
 	}
 
 	return null;
+}
+
+async function resolveProviderRuntimeOptions<P extends LlmProvider>(
+	projectId: string,
+	provider: P,
+): Promise<Partial<ProviderConfigMap[P]>> {
+	const envOptions = getEnvProviderRuntimeOptions(provider);
+	const project = await projectQueries.getProjectById(projectId).catch(() => null);
+	const configOptions = project?.path ? extractLlmProviderOptions(project.path, provider) : {};
+	return { ...envOptions, ...configOptions } as Partial<ProviderConfigMap[P]>;
+}
+
+function getEnvProviderRuntimeOptions(provider: LlmProvider): { reasoningEffort?: string } {
+	if (provider === 'openai') {
+		const reasoningEffort = env.NAO_OPENAI_REASONING_EFFORT ?? env.NAO_REASONING_EFFORT;
+		return reasoningEffort ? { reasoningEffort } : {};
+	}
+	if (provider === 'azure') {
+		const reasoningEffort = env.NAO_AZURE_REASONING_EFFORT ?? getAzureCompatibleGlobalReasoningEffort();
+		return reasoningEffort ? { reasoningEffort } : {};
+	}
+	return {};
+}
+
+function getAzureCompatibleGlobalReasoningEffort(): 'low' | 'medium' | 'high' | undefined {
+	const effort = env.NAO_REASONING_EFFORT;
+	return effort === 'low' || effort === 'medium' || effort === 'high' ? effort : undefined;
 }
 
 /**

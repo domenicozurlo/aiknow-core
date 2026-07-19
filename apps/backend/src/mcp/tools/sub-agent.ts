@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { LLM_PROVIDERS, type LlmSelectedModel } from '@nao/shared/types';
 import { type InferUIMessageChunk, readUIMessageStream } from 'ai';
 import { z } from 'zod';
 
@@ -63,6 +64,8 @@ const ASK_NAO_QUERIES_SCHEMA = z
 			'Forward `id` to `display_chart` as `query_id`; pick `x_axis_key` / `series[].data_key` from `columns`.',
 	);
 
+const ASK_NAO_MODEL_PROVIDER_SCHEMA = z.enum(LLM_PROVIDERS);
+
 export function registerSubAgentTools(server: McpServer, ctx: McpContext): void {
 	registerMcpTool(server, ctx, {
 		name: 'ask_nao',
@@ -83,6 +86,14 @@ export function registerSubAgentTools(server: McpServer, ctx: McpContext): void 
 						'Reuse only when the new question clearly builds on the same topic. ' +
 						'If the topic shifts or the prior reply was a refusal, omit it.',
 				),
+			modelProvider: ASK_NAO_MODEL_PROVIDER_SCHEMA.optional().describe(
+				'Optional LLM provider override for this run. Pass together with `modelId`; omit both to use the project default.',
+			),
+			modelId: z
+				.string()
+				.min(1)
+				.optional()
+				.describe('Optional model ID override for this run. Pass together with `modelProvider`.'),
 		},
 		outputSchema: {
 			status: z
@@ -104,14 +115,15 @@ export function registerSubAgentTools(server: McpServer, ctx: McpContext): void 
 				),
 		},
 		errorMessage: () => 'Nao agent failed to process the request.',
-		handler: async ({ question, chatId }) => {
+		handler: async ({ question, chatId, modelProvider, modelId }) => {
 			await mcpService.initializeMcpState(ctx.projectId);
 			await skillService.initializeSkills(ctx.projectId);
 
 			const { chat, uiMessages } = await buildChatContext(ctx.projectId, ctx.userId, question, chatId);
 			const naoChatUrl = chatUrl(chat.id);
+			const modelSelection = resolveAskNaoModelSelection(modelProvider, modelId);
 
-			const agent = await agentService.create(chat);
+			const agent = await agentService.create(chat, modelSelection);
 			askNaoRuns.start(chat.id);
 			const runPromise = runAskNaoInBackground(agent, uiMessages, chat.id, naoChatUrl);
 
@@ -148,6 +160,19 @@ export function registerSubAgentTools(server: McpServer, ctx: McpContext): void 
 			return resolveAnswerPayload(chatId);
 		},
 	});
+}
+
+function resolveAskNaoModelSelection(
+	modelProvider: LlmSelectedModel['provider'] | undefined,
+	modelId: string | undefined,
+): LlmSelectedModel | undefined {
+	if (!modelProvider && !modelId) {
+		return undefined;
+	}
+	if (!modelProvider || !modelId) {
+		throw new Error('Pass both `modelProvider` and `modelId`, or omit both to use the project default model.');
+	}
+	return { provider: modelProvider, modelId };
 }
 
 /**

@@ -36,16 +36,11 @@ export function SidebarVersionNotice({ isCollapsed }: SidebarVersionNoticeProps)
 	}
 
 	return (
-		<a
-			href={`https://github.com/getnao/nao/releases/tag/v${data.latestVersion}`}
-			target='_blank'
-			rel='noopener noreferrer'
-			className='flex items-center gap-2 px-3 py-2 mb-1 rounded-md text-xs text-amber-500 hover:bg-sidebar-accent transition-colors'
-		>
+		<div className='flex items-center gap-2 px-3 py-2 mb-1 rounded-md text-xs text-amber-500'>
 			<TriangleAlert className='size-3.5 shrink-0' />
 			<span className={cn('truncate transition-[opacity,visibility] duration-300', hideIf(isCollapsed))}>
 				{label}
 			</span>
-		</a>
+		</div>
 	);
 }

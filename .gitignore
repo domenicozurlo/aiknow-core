@@ -21,3 +21,5 @@ rsa_key.*
 apps/backend/projects/
 
 *.code-workspace
+nao_irriai_context_deploy_key
+nao_irriai_context_deploy_key.pub
