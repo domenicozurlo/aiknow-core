@@ -212,6 +212,7 @@ function UsageOverview({
 								chartType='stacked_bar'
 								xAxisLabelFormatter={(value) => format(new Date(value), dateFormats[granularity])}
 								valueFormatter={showCost ? formatUsd : undefined}
+								fitYAxisToData={showCost}
 								series={showCost ? costSeries : tokenSeries}
 								titleAccessory={
 									<Select

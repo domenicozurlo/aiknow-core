@@ -238,6 +238,51 @@ const BEDROCK_SAMPLING: ModelCapabilities = {
 /** Ollama local models: sampling + max output tokens (thinking is a model-creation setting, deferred). */
 const OLLAMA_SAMPLING: ModelCapabilities = { thinking: 'none', sampling: true, topK: true, maxOutputTokens: true };
 
+const OPENAI_MODELS = [
+	{
+		id: 'gpt-5.5',
+		name: 'GPT 5.5',
+		default: true,
+		contextWindow: 400_000,
+		costPerM: { inputNoCache: 5, inputCacheRead: 0.5, inputCacheWrite: 0, output: 30 },
+		capabilities: OPENAI_REASONING,
+	},
+	{
+		id: 'gpt-5.4',
+		name: 'GPT 5.4',
+		contextWindow: 400_000,
+		costPerM: { inputNoCache: 2.5, inputCacheRead: 0.25, inputCacheWrite: 0, output: 15 },
+		capabilities: OPENAI_REASONING,
+	},
+	{
+		id: 'gpt-5.4-mini',
+		name: 'GPT 5.4 mini',
+		contextWindow: 400_000,
+		costPerM: { inputNoCache: 0.75, inputCacheRead: 0.075, inputCacheWrite: 0, output: 4.5 },
+	},
+	{
+		id: 'gpt-5.2',
+		name: 'GPT 5.2',
+		contextWindow: 400_000,
+		costPerM: { inputNoCache: 1.75, inputCacheRead: 0.175, inputCacheWrite: 0, output: 14 },
+		capabilities: OPENAI_REASONING,
+	},
+	{
+		id: 'gpt-5-mini',
+		name: 'GPT 5 mini',
+		contextWindow: 400_000,
+		costPerM: { inputNoCache: 0.25, inputCacheRead: 0.025, inputCacheWrite: 0, output: 2 },
+		capabilities: OPENAI_REASONING,
+	},
+	{
+		id: 'gpt-4.1',
+		name: 'GPT 4.1',
+		contextWindow: 1_000_000,
+		costPerM: { inputNoCache: 3, inputCacheRead: 0.75, inputCacheWrite: 0, output: 12 },
+		capabilities: OPENAI_SAMPLING,
+	},
+] as const;
+
 /** Provider metadata: models, auth config, env vars. No SDK imports — safe for frontend. */
 export const PROVIDER_META: ProviderMetaMap = {
 	anthropic: {
@@ -312,50 +357,7 @@ export const PROVIDER_META: ProviderMetaMap = {
 		baseUrlEnvVar: 'OPENAI_BASE_URL',
 		extractorModelId: 'gpt-4.1-mini',
 		summaryModelId: 'gpt-4.1-mini',
-		models: [
-			{
-				id: 'gpt-5.5',
-				name: 'GPT 5.5',
-				default: true,
-				contextWindow: 400_000,
-				costPerM: { inputNoCache: 5, inputCacheRead: 0.5, inputCacheWrite: 0, output: 30 },
-				capabilities: OPENAI_REASONING,
-			},
-			{
-				id: 'gpt-5.4',
-				name: 'GPT 5.4',
-				contextWindow: 400_000,
-				costPerM: { inputNoCache: 2.5, inputCacheRead: 0.25, inputCacheWrite: 0, output: 15 },
-				capabilities: OPENAI_REASONING,
-			},
-			{
-				id: 'gpt-5.4-mini',
-				name: 'GPT 5.4 mini',
-				contextWindow: 400_000,
-				costPerM: { inputNoCache: 0.75, inputCacheRead: 0.075, inputCacheWrite: 0, output: 4.5 },
-			},
-			{
-				id: 'gpt-5.2',
-				name: 'GPT 5.2',
-				contextWindow: 400_000,
-				costPerM: { inputNoCache: 1.75, inputCacheRead: 0.175, inputCacheWrite: 0, output: 14 },
-				capabilities: OPENAI_REASONING,
-			},
-			{
-				id: 'gpt-5-mini',
-				name: 'GPT 5 mini',
-				contextWindow: 400_000,
-				costPerM: { inputNoCache: 0.25, inputCacheRead: 0.025, inputCacheWrite: 0, output: 2 },
-				capabilities: OPENAI_REASONING,
-			},
-			{
-				id: 'gpt-4.1',
-				name: 'GPT 4.1',
-				contextWindow: 1_000_000,
-				costPerM: { inputNoCache: 3, inputCacheRead: 0.75, inputCacheWrite: 0, output: 12 },
-				capabilities: OPENAI_SAMPLING,
-			},
-		],
+		models: OPENAI_MODELS,
 	},
 	google: {
 		auth: { apiKey: 'required' },
@@ -606,9 +608,9 @@ export const PROVIDER_META: ProviderMetaMap = {
 		},
 		envVar: 'AZURE_API_KEY',
 		baseUrlEnvVar: 'AZURE_OPENAI_BASE_URL',
-		extractorModelId: '',
-		summaryModelId: '',
-		models: [],
+		extractorModelId: 'gpt-4.1-mini',
+		summaryModelId: 'gpt-4.1-mini',
+		models: OPENAI_MODELS.map((model) => ({ ...model, name: `${model.name} (Azure)` })),
 	},
 };
 

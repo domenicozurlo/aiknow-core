@@ -104,6 +104,9 @@ const envSchema = z.object({
 	NAO_MODE: z.enum(['self-hosted', 'cloud']).default('self-hosted'),
 	NAO_PROJECTS_DIR: z.string().default('./projects'),
 	NAO_CORE_VERSION: z.string().optional(),
+	NAO_REASONING_EFFORT: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']).optional(),
+	NAO_OPENAI_REASONING_EFFORT: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']).optional(),
+	NAO_AZURE_REASONING_EFFORT: z.enum(['low', 'medium', 'high']).optional(),
 
 	NAO_LICENSE: z
 		.string()

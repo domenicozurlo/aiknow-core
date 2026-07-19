@@ -285,6 +285,7 @@ class StarRocksConfig(DatabaseConfig):
             "user": self.user,
             "password": self.password,
             "autocommit": True,
+            "ssl_disabled": False,
         }
         if self.database:
             catalog = self.catalog or DEFAULT_CATALOG

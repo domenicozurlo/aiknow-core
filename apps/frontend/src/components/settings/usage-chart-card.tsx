@@ -12,6 +12,7 @@ export interface UsageChartCardProps {
 	series: { data_key: string; color: string; label: string }[];
 	xAxisLabelFormatter?: (value: string) => string;
 	valueFormatter?: (value: number) => string;
+	fitYAxisToData?: boolean;
 	titleAccessory?: ReactNode;
 	showLegend?: boolean;
 }
@@ -26,6 +27,7 @@ export function UsageChartCard({
 	series,
 	xAxisLabelFormatter,
 	valueFormatter,
+	fitYAxisToData,
 	titleAccessory,
 	showLegend,
 }: UsageChartCardProps) {
@@ -54,6 +56,7 @@ export function UsageChartCard({
 						xAxisType='category'
 						xAxisLabelFormatter={xAxisLabelFormatter}
 						valueFormatter={valueFormatter}
+						fitYAxisToData={fitYAxisToData}
 						series={series}
 						titleAccessory={titleAccessory}
 						showLegend={showLegend}

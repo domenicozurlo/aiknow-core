@@ -275,6 +275,7 @@ export interface BuildChartProps {
 	yAxisRightMin?: number;
 	yAxisRightMax?: number;
 	yAxisRightLabel?: string;
+	fitYAxisToData?: boolean;
 	/** Chart background color, used as the separator between stacked segments. Pass a concrete color on surfaces where CSS vars do not resolve (backend PNG/HTML export). */
 	backgroundColor?: string;
 	/** Prefix for SVG gradient ids so multiple charts on one page (and drag clones) don't collide. */
@@ -659,7 +660,7 @@ function buildBarChart(props: ResolvedProps) {
 					axisLine={false}
 					minTickGap={12}
 					tickFormatter={valueFormatter ?? formatYAxisTick}
-					domain={resolveYAxisDomain(yAxisMin, yAxisMax, axisValues, true)}
+					domain={resolveYAxisDomain(yAxisMin, yAxisMax, axisValues, !props.fitYAxisToData)}
 					allowDataOverflow={yAxisMin !== undefined || yAxisMax !== undefined}
 				/>
 			)}
@@ -758,7 +759,7 @@ function buildAreaChart(props: ResolvedProps) {
 	const gradientIdFor = (index: number) => `${gradientIdPrefix}grad-${index}`;
 	const isStacked = displayChart.isStackedChartType(chartType);
 	const isPercent = displayChart.isPercentStackedChartType(chartType);
-	const zeroBaseline = chartType !== 'line';
+	const zeroBaseline = chartType !== 'line' && !props.fitYAxisToData;
 	const dataKeys = series.map((s) => s.data_key);
 	const axisValues = isStacked ? collectStackedAxisValues(data, dataKeys) : collectAxisValues(data, dataKeys);
 	const { renderedSeries, stackTotalLabel, stackTotalLabelIndex } = getDataLabelSetup(props, isStacked);

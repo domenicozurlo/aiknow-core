@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { extractConfiguredRepos } from '../src/utils/nao-config';
+import { extractConfiguredRepos, extractLlmProviderOptions } from '../src/utils/nao-config';
 
 vi.mock('../src/utils/logger', () => ({
 	logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -106,6 +106,61 @@ describe('extractConfiguredRepos', () => {
 					url: 'https://bitbucket.org/nao/dbt-models.git',
 				},
 			]);
+		} finally {
+			fs.rmSync(dir, { force: true, recursive: true });
+		}
+	});
+});
+
+describe('extractLlmProviderOptions', () => {
+	it('reads a global reasoning effort from nao_config.yaml', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nao-config-'));
+		try {
+			fs.writeFileSync(
+				path.join(dir, 'nao_config.yaml'),
+				['project_name: demo', 'llm:', '  reasoning_effort: low'].join('\n'),
+			);
+
+			expect(extractLlmProviderOptions(dir, 'openai')).toEqual({ reasoningEffort: 'low' });
+			expect(extractLlmProviderOptions(dir, 'azure')).toEqual({ reasoningEffort: 'low' });
+		} finally {
+			fs.rmSync(dir, { force: true, recursive: true });
+		}
+	});
+
+	it('lets provider-specific reasoning effort override the global value', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nao-config-'));
+		try {
+			fs.writeFileSync(
+				path.join(dir, 'nao_config.yaml'),
+				[
+					'project_name: demo',
+					'llm:',
+					'  reasoning_effort: low',
+					'  providers:',
+					'    openai:',
+					'      reasoning_effort: high',
+					'  azure:',
+					'    reasoningEffort: medium',
+				].join('\n'),
+			);
+
+			expect(extractLlmProviderOptions(dir, 'openai')).toEqual({ reasoningEffort: 'high' });
+			expect(extractLlmProviderOptions(dir, 'azure')).toEqual({ reasoningEffort: 'medium' });
+		} finally {
+			fs.rmSync(dir, { force: true, recursive: true });
+		}
+	});
+
+	it('ignores unsupported Azure reasoning effort values', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nao-config-'));
+		try {
+			fs.writeFileSync(
+				path.join(dir, 'nao_config.yaml'),
+				['project_name: demo', 'llm:', '  azure:', '    reasoning_effort: minimal'].join('\n'),
+			);
+
+			expect(extractLlmProviderOptions(dir, 'azure')).toEqual({});
 		} finally {
 			fs.rmSync(dir, { force: true, recursive: true });
 		}

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { RepoProvider } from '@nao/shared/types';
+import type { LlmProvider, RepoProvider } from '@nao/shared/types';
 import yaml from 'js-yaml';
 
 import { escapeRegExp, gitlabBaseUrl } from '../services/gitlab';
@@ -9,6 +9,12 @@ import type { LinkedContextRepo } from '../types/context-recommendation';
 import { logger } from './logger';
 
 const ENV_PATTERN = /\$?\{\{\s*env\(['"]([^'"]+)['"]\)\s*\}\}/g;
+const OPENAI_REASONING_EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+const AZURE_REASONING_EFFORTS = new Set(['low', 'medium', 'high']);
+
+export type LlmProviderRuntimeOptions = {
+	reasoningEffort?: string;
+};
 
 export function extractRequiredEnvVars(projectFolder: string): string[] {
 	const configPath = path.join(projectFolder, 'nao_config.yaml');
@@ -62,6 +68,37 @@ export function extractConfiguredRepos(projectFolder: string): LinkedContextRepo
 	});
 }
 
+export function extractLlmProviderOptions(projectFolder: string, provider: LlmProvider): LlmProviderRuntimeOptions {
+	const configPath = path.join(projectFolder, 'nao_config.yaml');
+	if (!fs.existsSync(configPath)) {
+		return {};
+	}
+
+	const config = loadConfig(configPath);
+	if (!isRecord(config)) {
+		return {};
+	}
+
+	const llm = getRecord(config, 'llm');
+	if (!llm) {
+		return {};
+	}
+
+	const reasoningEffort =
+		readString(getRecord(llm, 'providers')?.[provider], 'reasoning_effort') ??
+		readString(getRecord(llm, 'providers')?.[provider], 'reasoningEffort') ??
+		readString(getRecord(llm, provider), 'reasoning_effort') ??
+		readString(getRecord(llm, provider), 'reasoningEffort') ??
+		readString(llm, 'reasoning_effort') ??
+		readString(llm, 'reasoningEffort');
+
+	if (!reasoningEffort) {
+		return {};
+	}
+
+	return isReasoningEffortAllowed(provider, reasoningEffort, configPath) ? { reasoningEffort } : {};
+}
+
 function loadConfig(configPath: string): unknown {
 	try {
 		return yaml.load(fs.readFileSync(configPath, 'utf-8'));
@@ -89,6 +126,37 @@ function parseRepoFullName(url: string): { repoFullName: string; provider: RepoP
 	}
 
 	return null;
+}
+
+function getRecord(value: unknown, key: string): Record<string, unknown> | undefined {
+	if (!isRecord(value)) {
+		return undefined;
+	}
+	const child = value[key];
+	return isRecord(child) ? child : undefined;
+}
+
+function readString(value: unknown, key: string): string | undefined {
+	if (!isRecord(value)) {
+		return undefined;
+	}
+	const raw = value[key];
+	return typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : undefined;
+}
+
+function isReasoningEffortAllowed(provider: LlmProvider, effort: string, configPath: string): boolean {
+	if (provider === 'openai' && OPENAI_REASONING_EFFORTS.has(effort)) {
+		return true;
+	}
+	if (provider === 'azure' && AZURE_REASONING_EFFORTS.has(effort)) {
+		return true;
+	}
+	if (provider === 'openai' || provider === 'azure') {
+		logger.warn(`Ignoring unsupported reasoning_effort "${effort}" for ${provider} in ${configPath}.`, {
+			source: 'system',
+		});
+	}
+	return false;
 }
 
 function parseGithubRepoFullName(url: string): string | null {

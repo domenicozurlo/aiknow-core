@@ -23,3 +23,5 @@ apps/backend/projects/
 *.code-workspace
 
 .cursor/
+nao_irriai_context_deploy_key
+nao_irriai_context_deploy_key.pub

@@ -187,6 +187,7 @@ export function createProviderModel(
 	settings: ProviderSettings,
 	modelId: string,
 	inferenceSettings?: ModelInferenceSettings,
+	runtimeOptions: Partial<ProviderConfigMap[typeof provider]> = {},
 ): ProviderModelResult {
 	const providerConfig = LLM_PROVIDERS[provider];
 	const defaultOptions = providerConfig.defaultOptions ?? {};
@@ -201,7 +202,7 @@ export function createProviderModel(
 	return {
 		model: providerConfig.create(settings, modelId),
 		providerOptions: {
-			[optionKey]: { ...defaultOptions, ...modelConfig, ...providerOverrides },
+			[optionKey]: { ...defaultOptions, ...modelConfig, ...runtimeOptions, ...providerOverrides },
 		},
 		contextWindow,
 		callSettings,

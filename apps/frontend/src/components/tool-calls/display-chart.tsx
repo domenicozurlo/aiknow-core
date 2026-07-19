@@ -434,6 +434,7 @@ export interface ChartDisplayProps {
 	yAxisRightMin?: number;
 	yAxisRightMax?: number;
 	yAxisRightLabel?: string;
+	fitYAxisToData?: boolean;
 	showDataLabels?: boolean;
 	animate?: boolean;
 	comparisonMode?: displayChart.ComparisonMode;
@@ -463,6 +464,7 @@ export const ChartDisplay = memo(function ChartDisplay({
 	yAxisRightMin,
 	yAxisRightMax,
 	yAxisRightLabel,
+	fitYAxisToData,
 	showDataLabels,
 	animate = false,
 	comparisonMode,
@@ -616,6 +618,7 @@ export const ChartDisplay = memo(function ChartDisplay({
 				yAxisRightMin,
 				yAxisRightMax,
 				yAxisRightLabel,
+				fitYAxisToData,
 				children: [
 					<ChartTooltip
 						key='tooltip'
@@ -674,6 +677,7 @@ export const ChartDisplay = memo(function ChartDisplay({
 			yAxisRightMin,
 			yAxisRightMax,
 			yAxisRightLabel,
+			fitYAxisToData,
 			isDualAxis,
 			showDataLabels,
 			animate,

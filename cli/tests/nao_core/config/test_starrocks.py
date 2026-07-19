@@ -1,3 +1,6 @@
+import sys
+import types
+
 from nao_core.config.databases.starrocks import StarRocksConfig
 
 
@@ -40,3 +43,24 @@ def test_starrocks_get_database_name_variants():
     assert both.get_database_name() == "hive1.analytics"
     assert catalog_only.get_database_name() == "hive1"
     assert fallback.get_database_name() == "starrocks"
+
+
+def test_starrocks_connect_uses_tls(monkeypatch):
+    captured = {}
+
+    def fake_connect(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    mysql_module = types.ModuleType("mysql")
+    connector_module = types.ModuleType("mysql.connector")
+    connector_module.connect = fake_connect
+    mysql_module.connector = connector_module
+
+    monkeypatch.setitem(sys.modules, "mysql", mysql_module)
+    monkeypatch.setitem(sys.modules, "mysql.connector", connector_module)
+
+    cfg = StarRocksConfig(name="sr", host="localhost", user="root")
+    cfg.connect()
+
+    assert captured["ssl_disabled"] is False
