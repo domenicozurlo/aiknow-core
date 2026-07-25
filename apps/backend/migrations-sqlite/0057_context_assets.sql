@@ -1,4 +1,4 @@
-CREATE TABLE `context_asset` (
+CREATE TABLE IF NOT EXISTS `context_asset` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
 	`virtual_path` text NOT NULL,
@@ -9,5 +9,5 @@ CREATE TABLE `context_asset` (
 	FOREIGN KEY (`project_id`) REFERENCES `project`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `context_asset_projectId_idx` ON `context_asset` (`project_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `context_asset_project_path_hash_unique` ON `context_asset` (`project_id`,`virtual_path`,`content_hash`);
+CREATE INDEX IF NOT EXISTS `context_asset_projectId_idx` ON `context_asset` (`project_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS `context_asset_project_path_hash_unique` ON `context_asset` (`project_id`,`virtual_path`,`content_hash`);
