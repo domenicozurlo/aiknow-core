@@ -95,15 +95,15 @@ export const isPublicEmailDomain = (domain: string): boolean => {
 };
 
 export const isEmailDomainAllowed = (userEmail: string, authDomains?: string) => {
-	if (authDomains) {
-		const allowedDomains = authDomains.split(',').map((domain) => domain.trim().toLowerCase());
-		const userEmailDomain = userEmail.split('@').at(1)?.toLowerCase();
-		if (!userEmailDomain) {
-			return false;
-		}
-		return allowedDomains.includes(userEmailDomain);
+	const allowedDomains = authDomains
+		?.split(',')
+		.map((domain) => domain.trim().toLowerCase())
+		.filter(Boolean);
+	if (!allowedDomains?.length) {
+		return false;
 	}
-	return true;
+	const userEmailDomain = userEmail.split('@').at(1)?.toLowerCase();
+	return Boolean(userEmailDomain && allowedDomains.includes(userEmailDomain));
 };
 
 /**
@@ -159,6 +159,9 @@ export function groupBy<T, K extends string>(
 		{} as Record<K, T[]>,
 	);
 }
+
+export const previewApiKey = (apiKey: string | null | undefined): string | null =>
+	apiKey ? apiKey.slice(0, 8) + '...' + apiKey.slice(-4) : null;
 
 export const buildCredentialPreviews = (
 	credentials: Record<string, string> | null | undefined,

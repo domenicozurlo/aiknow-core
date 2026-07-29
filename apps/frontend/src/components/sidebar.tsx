@@ -23,12 +23,15 @@ import type { LucideIcon } from 'lucide-react';
 
 import { BrandLogo } from '@/components/brand-logo';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCommandMenuCallback } from '@/contexts/command-menu-callback';
 import { useSidebar } from '@/contexts/sidebar';
 import { useChatViewPreferences } from '@/hooks/use-chat-view-preferences';
 import { useSidebarSectionOpen } from '@/hooks/use-sidebar-section-open';
 import { useTimeAgo } from '@/hooks/use-time-ago';
 import { getActiveProjectId, setActiveProjectId } from '@/lib/active-project';
+import { getShortcutLabel } from '@/lib/keyboard-shortcuts';
+import { invalidateStoriesCaches } from '@/lib/stories-cache';
 import { cn, hideIf } from '@/lib/utils';
 import { trpc } from '@/main';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -38,6 +41,7 @@ export function Sidebar() {
 	const queryClient = useQueryClient();
 	const matchRoute = useMatchRoute();
 	const { isCollapsed, isMobile, isMobileOpen, closeMobile, toggle: toggleSidebar } = useSidebar();
+	const [toggleHintOpen, setToggleHintOpen] = useState(false);
 	const { fire: openCommandMenu } = useCommandMenuCallback();
 	const project = useQuery(trpc.project.getCurrent.queryOptions());
 	const projects = useQuery(trpc.project.listForCurrentUser.queryOptions());
@@ -54,6 +58,10 @@ export function Sidebar() {
 	const effectiveIsCollapsed = isMobile ? false : isCollapsed;
 
 	useEffect(() => {
+		setToggleHintOpen(false);
+	}, [effectiveIsCollapsed]);
+
+	useEffect(() => {
 		if (isMobile && isMobileOpen) {
 			closeMobile();
 		}
@@ -67,14 +75,7 @@ export function Sidebar() {
 	}, [navigate, isMobile, closeMobile]);
 
 	const handleNavigateStories = useCallback(() => {
-		void queryClient.invalidateQueries({ queryKey: trpc.storyFolder.listTree.queryKey() });
-		void queryClient.invalidateQueries({ queryKey: trpc.storyFolder.listItems.queryKey() });
-		void queryClient.invalidateQueries({ queryKey: trpc.story.listAll.queryKey() });
-		void queryClient.invalidateQueries({ queryKey: trpc.story.listStandalone.queryKey() });
-		void queryClient.invalidateQueries({ queryKey: trpc.story.listArchived.queryKey() });
-		void queryClient.invalidateQueries({ queryKey: trpc.story.listStandaloneArchived.queryKey() });
-		void queryClient.invalidateQueries({ queryKey: trpc.storyShare.list.queryKey() });
-		void queryClient.invalidateQueries({ queryKey: trpc.favorite.list.queryKey() });
+		invalidateStoriesCaches(queryClient);
 		navigate({ to: '/stories', search: { folderId: null } });
 		if (isMobile) {
 			closeMobile();
@@ -94,21 +95,6 @@ export function Sidebar() {
 			closeMobile();
 		}
 	}, [openCommandMenu, isMobile, closeMobile]);
-
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (isViewer) {
-				return;
-			}
-			if (e.shiftKey && e.metaKey && e.key.toLowerCase() === 'o') {
-				e.preventDefault();
-				handleNavigateHome();
-			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [handleNavigateHome, isViewer]);
 
 	useEffect(() => {
 		if (!project.data?.id) {
@@ -172,18 +158,31 @@ export function Sidebar() {
 							<X className='size-4' />
 						</Button>
 					) : (
-						<Button
-							variant='ghost'
-							size='icon-md'
-							onClick={() => toggleSidebar()}
-							className='text-muted-foreground ml-auto z-10'
-						>
-							{effectiveIsCollapsed ? (
-								<ArrowRightToLine className='size-4' />
-							) : (
-								<ArrowLeftFromLine className='size-4' />
-							)}
-						</Button>
+						<Tooltip open={toggleHintOpen} onOpenChange={setToggleHintOpen}>
+							<TooltipTrigger asChild>
+								<Button
+									variant='ghost'
+									size='icon-md'
+									onClick={() => toggleSidebar()}
+									className='text-muted-foreground ml-auto z-10'
+									aria-label='Toggle sidebar'
+								>
+									{effectiveIsCollapsed ? (
+										<ArrowRightToLine className='size-4' />
+									) : (
+										<ArrowLeftFromLine className='size-4' />
+									)}
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent side='right'>
+								<span className='flex items-center gap-2'>
+									Toggle sidebar
+									<kbd className='text-[10px] opacity-60 font-sans'>
+										{getShortcutLabel('toggle-sidebar')}
+									</kbd>
+								</span>
+							</TooltipContent>
+						</Tooltip>
 					)}
 				</div>
 				{!isInSettings && (
@@ -193,7 +192,7 @@ export function Sidebar() {
 								<SidebarMenuButton
 									icon={PlusIcon}
 									label='New chat'
-									shortcut='⇧⌘O'
+									shortcut={getShortcutLabel('new-chat')}
 									isCollapsed={effectiveIsCollapsed}
 									onClick={handleNavigateHome}
 								/>
@@ -201,14 +200,14 @@ export function Sidebar() {
 							<SidebarMenuButton
 								icon={SearchIcon}
 								label='Search chats'
-								shortcut='⌘K'
+								shortcut={getShortcutLabel('command-menu')}
 								isCollapsed={effectiveIsCollapsed}
 								onClick={handleSearchChats}
 							/>
 							<SidebarMenuButton
 								icon={StoryIcon as unknown as LucideIcon}
 								label='Stories'
-								shortcut=''
+								shortcut={getShortcutLabel('go-to-stories')}
 								isCollapsed={effectiveIsCollapsed}
 								onClick={handleNavigateStories}
 							/>

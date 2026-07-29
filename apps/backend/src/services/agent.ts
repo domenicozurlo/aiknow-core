@@ -32,7 +32,6 @@ import { renderToMarkdown } from '../lib/markdown';
 import * as chatQueries from '../queries/chat.queries';
 import * as imageQueries from '../queries/image.queries';
 import * as projectQueries from '../queries/project.queries';
-import * as llmConfigQueries from '../queries/project-llm-config.queries';
 import * as storyQueries from '../queries/story.queries';
 import { AgentSettings } from '../types/agent-settings';
 import {
@@ -58,8 +57,8 @@ import {
 import { assertBudgetNotExceeded } from '../utils/budget';
 import { HandlerError } from '../utils/error';
 import {
-	getDefaultModelId,
-	getEnvModelSelections,
+	getProjectAvailableModels,
+	getProjectDeclaredModels,
 	resolveAnnotationModelId,
 	resolveProviderModel,
 	resolveProviderSettings,
@@ -289,20 +288,11 @@ export class AgentService {
 			return modelSelection;
 		}
 
-		// Get the first available provider config
-		const configs = await llmConfigQueries.getProjectLlmConfigs(projectId);
-		const config = configs.at(0);
-		if (config) {
-			return {
-				provider: config.provider,
-				modelId: getDefaultModelId(config.provider),
-			};
-		}
-
-		// Fallback to env-based provider
-		const envSelection = getEnvModelSelections().at(0);
-		if (envSelection) {
-			return envSelection;
+		// Same order the model picker offers, across the database, nao_config.yaml and the environment.
+		const available = await getProjectAvailableModels(projectId);
+		const first = available.at(0);
+		if (first) {
+			return { provider: first.provider, modelId: first.modelId };
 		}
 
 		throw new HandlerError('BAD_REQUEST', 'No model config found');
@@ -360,6 +350,8 @@ export const MAX_OUTPUT_TOKENS = 16_000;
 
 class AgentManager {
 	private readonly _agent: ToolLoopAgent<never, AgentTools, never>;
+	private readonly _finished: Promise<void>;
+	private _resolveFinished: (() => void) | undefined;
 	private _streamWriter?: UIMessageStreamWriter<UIMessage>;
 
 	constructor(
@@ -373,6 +365,9 @@ class AgentManager {
 		stopWhen: StopCondition<AgentTools>[] = [hasToolCall('suggest_follow_ups'), hasToolCall('clarification')],
 		private readonly _systemPromptOverride?: string,
 	) {
+		this._finished = new Promise((resolve) => {
+			this._resolveFinished = resolve;
+		});
 		const callSettings = this._modelConfig.callSettings ?? {};
 		const provider = this._modelSelection.provider;
 		const providerOptions = fitThinkingBudget(this._modelConfig.providerOptions, this._maxOutputTokens);
@@ -419,7 +414,7 @@ class AgentManager {
 			onCompactionStarted: () => {
 				this._streamWriter?.write({
 					type: 'data-compactionSummaryStarted',
-					data: undefined,
+					data: null,
 				});
 			},
 			onCompactionFinished: (result) => {
@@ -535,7 +530,7 @@ class AgentManager {
 						llmModelId: this._modelSelection.modelId,
 					});
 				} finally {
-					this._onDispose();
+					this._finish();
 				}
 			},
 		});
@@ -810,9 +805,11 @@ class AgentManager {
 			const durationMs = Math.round(performance.now() - startTime);
 
 			const usage = convertToTokenUsage(result.totalUsage);
-			const customModels = await llmConfigQueries
-				.getProjectLlmConfigByProvider(this.chat.projectId, this._modelSelection.provider)
-				.then((c) => c?.customModels ?? [])
+			const customModels = await getProjectDeclaredModels(this.chat.projectId)
+				.then(
+					(sources) =>
+						sources.find((source) => source.provider === this._modelSelection.provider)?.models ?? [],
+				)
 				.catch(() => []);
 			const cost = convertToCost(
 				usage,
@@ -834,7 +831,7 @@ class AgentManager {
 				responseParts: [],
 			};
 		} finally {
-			this._onDispose();
+			this._finish();
 		}
 	}
 
@@ -844,6 +841,23 @@ class AgentManager {
 
 	stop(): void {
 		this._abortController.abort();
+	}
+
+	waitUntilFinished(): Promise<void> {
+		return this._finished;
+	}
+
+	private _markFinished(): void {
+		this._resolveFinished?.();
+		this._resolveFinished = undefined;
+	}
+
+	private _finish(): void {
+		try {
+			this._onDispose();
+		} finally {
+			this._markFinished();
+		}
 	}
 
 	private _addCitationContext(messages: UIMessage[]): UIMessage[] {
