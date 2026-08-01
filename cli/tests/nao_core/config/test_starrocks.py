@@ -54,8 +54,8 @@ def test_starrocks_connect_uses_tls(monkeypatch):
 
     mysql_module = types.ModuleType("mysql")
     connector_module = types.ModuleType("mysql.connector")
-    connector_module.connect = fake_connect
-    mysql_module.connector = connector_module
+    setattr(connector_module, "connect", fake_connect)
+    setattr(mysql_module, "connector", connector_module)
 
     monkeypatch.setitem(sys.modules, "mysql", mysql_module)
     monkeypatch.setitem(sys.modules, "mysql.connector", connector_module)

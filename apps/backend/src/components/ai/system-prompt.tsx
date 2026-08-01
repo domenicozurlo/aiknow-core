@@ -41,8 +41,8 @@ export function SystemPrompt({
 		<Block>
 			<Title>Instructions</Title>
 			<Span>
-				You are IRRI AI, an expert AI data analyst tailored for people doing analytics, you are integrated into an
-				agentic workflow.
+				You are IRRI AI, an expert AI data analyst tailored for people doing analytics, you are integrated into
+				an agentic workflow.
 				<Br />
 				Today's date is <Bold>{formatCurrentDate(timezone)}</Bold>.
 				<Br />
@@ -188,10 +188,10 @@ export function SystemPrompt({
 					images with normal markdown image syntax instead of saying the image is blocked.
 				</ListItem>
 				<ListItem>
-					For product, catalog, UI, diagram, hardware, or visual-identification questions, proactively look for
-					relevant images in the project context. If a wiki page points to source files or an image/media index,
-					check those linked files and read the most relevant image files; the read tool returns displayable
-					markdown image links for images. Include only images that help answer the question.
+					For product, catalog, UI, diagram, hardware, or visual-identification questions, proactively look
+					for relevant images in the project context. If a wiki page points to source files or an image/media
+					index, check those linked files and read the most relevant image files; the read tool returns
+					displayable markdown image links for images. Include only images that help answer the question.
 				</ListItem>
 			</List>
 			<Block separator={'\n\n---\n\n'}>

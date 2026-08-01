@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic import Field, field_validator
 
@@ -14,6 +14,7 @@ from .base import DatabaseConfig
 from .context import DatabaseContext
 
 SYSTEM_SCHEMAS = ("information_schema", "mysql", "performance_schema", "sys")
+MysqlSslMode = Literal["DISABLED", "PREFERRED", "REQUIRED", "VERIFY_CA", "VERIFY_IDENTITY"]
 
 
 class MysqlDatabaseContext(DatabaseContext):
@@ -67,7 +68,7 @@ class MysqlConfig(DatabaseConfig):
     user: str = Field(description="Username")
     password: str = Field(description="Password")
     schema_name: str | None = Field(default=None, description="Default schema (optional)")
-    ssl_mode: Literal["DISABLED", "PREFERRED", "REQUIRED", "VERIFY_CA", "VERIFY_IDENTITY"] | None = Field(
+    ssl_mode: MysqlSslMode | None = Field(
         default=None,
         description="MySQL SSL mode (optional). Use REQUIRED for servers that require encrypted transport.",
     )
@@ -97,7 +98,7 @@ class MysqlConfig(DatabaseConfig):
         user = ask_text("Username:", required_field=True)
         password = ask_text("Password:", password=True) or ""
         schema_name = ask_text("Default schema (optional):")
-        ssl_mode = ask_text("SSL mode (optional, e.g. REQUIRED, VERIFY_IDENTITY):") or None
+        ssl_mode = cast(MysqlSslMode | None, ask_text("SSL mode (optional, e.g. REQUIRED, VERIFY_IDENTITY):") or None)
 
         return MysqlConfig(
             name=name,

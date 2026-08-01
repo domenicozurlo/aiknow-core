@@ -336,8 +336,18 @@ function buildAreaChart(props: ResolvedProps) {
 }
 
 function buildScatterChart(props: ResolvedProps) {
-	const { data, xAxisKey, xAxisType, series, colorFor, showGrid, children, margin, yAxisTickFormatter, yAxisDomainMax } =
-		props;
+	const {
+		data,
+		xAxisKey,
+		xAxisType,
+		series,
+		colorFor,
+		showGrid,
+		children,
+		margin,
+		yAxisTickFormatter,
+		yAxisDomainMax,
+	} = props;
 
 	return (
 		<ScatterChart data={data} accessibilityLayer margin={margin}>

@@ -60,7 +60,7 @@ services:
             # NAO_CONTEXT_GIT_SUBPATH: analytics/finance
             # Option B-bis: SSH deploy key auth (use git@... URL):
             NAO_CONTEXT_GIT_URL: git@github.com:domenicozurlo/irriai-context.git
-            NAO_CONTEXT_GIT_SSH_KEY: ${NAO_CONTEXT_GIT_SSH_KEY}       # raw private key contents
+            NAO_CONTEXT_GIT_SSH_KEY: ${NAO_CONTEXT_GIT_SSH_KEY} # raw private key contents
 
             # Optional: Schedule periodic git pull (cron expression)
             # NAO_REFRESH_SCHEDULE: "0 * * * *"  # Every hour
