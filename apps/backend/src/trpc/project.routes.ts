@@ -178,6 +178,7 @@ export const projectRoutes = {
 					provider: llmProviderSchema,
 					modelId: z.string(),
 					name: z.string(),
+					baseUrl: z.string().nullable(),
 				}),
 			),
 		)

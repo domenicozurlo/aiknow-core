@@ -1,6 +1,7 @@
+from typing import cast
 from unittest.mock import MagicMock, patch
 
-from nao_core.config.databases.mysql import MysqlConfig
+from nao_core.config.databases.mysql import MysqlConfig, MysqlSslMode
 
 
 def test_connect_forwards_tls_options() -> None:
@@ -12,7 +13,7 @@ def test_connect_forwards_tls_options() -> None:
         database="app",
         user="alice",
         password="secret",
-        ssl_mode="required",
+        ssl_mode=cast(MysqlSslMode, "required"),
         ssl_ca="/etc/ssl/certs/mysql-ca.pem",
     )
 
