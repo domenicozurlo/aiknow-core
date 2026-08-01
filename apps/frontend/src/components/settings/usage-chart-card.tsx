@@ -12,7 +12,9 @@ export interface UsageChartCardProps {
 	chartType: 'bar' | 'stacked_bar';
 	series: { data_key: string; color: string; label: string }[];
 	xAxisLabelFormatter: (value: string) => string;
+	yAxisTickFormatter?: (value: number) => string;
 	filters: React.ReactNode;
+	fitYAxisToData?: boolean;
 }
 
 export function UsageChartCard({
@@ -25,7 +27,9 @@ export function UsageChartCard({
 	chartType,
 	series,
 	xAxisLabelFormatter,
+	yAxisTickFormatter,
 	filters,
+	fitYAxisToData,
 }: UsageChartCardProps) {
 	return (
 		<SettingsCard title={title} titleSize='lg' description={description} action={filters}>
@@ -49,8 +53,10 @@ export function UsageChartCard({
 						xAxisKey='date'
 						xAxisType='category'
 						xAxisLabelFormatter={xAxisLabelFormatter}
+						yAxisTickFormatter={yAxisTickFormatter}
 						series={series}
 						showGrid={true}
+						fitYAxisToData={fitYAxisToData}
 					/>
 				</div>
 			)}

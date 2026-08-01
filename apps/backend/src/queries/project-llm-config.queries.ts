@@ -72,6 +72,11 @@ export const getProjectModelProvider = async (projectId: string): Promise<LlmPro
 		return 'openai';
 	}
 
+	const firstConfig = configs.at(0);
+	if (firstConfig) {
+		return firstConfig.provider;
+	}
+
 	// Fall back to env providers
 	return getDefaultEnvProvider();
 };

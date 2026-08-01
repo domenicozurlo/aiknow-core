@@ -61,7 +61,7 @@ export const LLM_PROVIDERS: LlmProvidersType = {
 	openai: {
 		...PROVIDER_META.openai,
 		create: (settings, modelId) => createOpenAI(settings).responses(modelId),
-		defaultOptions: { store: false, truncation: 'auto' },
+		defaultOptions: { store: false, truncation: 'auto', reasoningSummary: 'auto' },
 	},
 	google: {
 		...PROVIDER_META.google,
@@ -163,6 +163,7 @@ export function createProviderModel(
 	provider: LlmProvider,
 	settings: ProviderSettings,
 	modelId: string,
+	runtimeOptions: Partial<ProviderConfigMap[typeof provider]> = {},
 ): ProviderModelResult {
 	const providerConfig = LLM_PROVIDERS[provider];
 	const defaultOptions = providerConfig.defaultOptions ?? {};
@@ -172,7 +173,7 @@ export function createProviderModel(
 	return {
 		model: providerConfig.create(settings, modelId),
 		providerOptions: {
-			[provider]: { ...defaultOptions, ...modelConfig },
+			[provider]: { ...defaultOptions, ...modelConfig, ...runtimeOptions },
 		},
 		contextWindow,
 	};

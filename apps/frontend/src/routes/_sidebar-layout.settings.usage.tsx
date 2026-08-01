@@ -19,6 +19,20 @@ export const Route = createFileRoute('/_sidebar-layout/settings/usage')({
 	component: UsagePage,
 });
 
+const formatUsdAxis = (value: number): string => {
+	if (value === 0) {
+		return '$0';
+	}
+	const abs = Math.abs(value);
+	const maximumFractionDigits = abs < 0.01 ? 4 : abs < 1 ? 3 : 2;
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+		minimumFractionDigits: 0,
+		maximumFractionDigits,
+	}).format(value);
+};
+
 function UsagePage() {
 	const [granularity, setGranularity] = useState<Granularity>('day');
 	const [provider, setProvider] = useState<LlmProvider | 'all'>('all');
@@ -107,6 +121,8 @@ function UsagePage() {
 						{ data_key: 'inputCacheWriteCost', color: 'var(--chart-3)', label: 'Input (cache write)' },
 						{ data_key: 'outputCost', color: 'var(--chart-4)', label: 'Output' },
 					]}
+					yAxisTickFormatter={formatUsdAxis}
+					fitYAxisToData
 					filters={filtersComponent}
 				/>
 			)}

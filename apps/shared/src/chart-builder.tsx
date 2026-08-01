@@ -64,11 +64,13 @@ export interface BuildChartProps {
 	series: displayChart.SeriesConfig[];
 	colorFor?: (key: string, index: number) => string;
 	labelFormatter?: (value: string) => string;
+	yAxisTickFormatter?: (value: number) => string;
 	showGrid?: boolean;
 	children?: React.ReactNode[];
 	margin?: { top?: number; right?: number; bottom?: number; left?: number };
 	title?: string;
 	maxXAxisTicks?: number;
+	fitYAxisToData?: boolean;
 }
 
 /**
@@ -101,6 +103,7 @@ export function buildChart(props: BuildChartProps) {
 function buildResolved(props: BuildChartProps) {
 	const colorFor = props.colorFor ?? defaultColorFor;
 	const labelFormatter = props.labelFormatter ?? ((v: string) => labelize(v));
+	const yAxisTickFormatter = props.yAxisTickFormatter ?? formatYAxisTick;
 
 	const titleChild = props.title ? (
 		<Customized
@@ -126,12 +129,15 @@ function buildResolved(props: BuildChartProps) {
 		props.maxXAxisTicks && props.data.length > props.maxXAxisTicks
 			? Math.ceil(props.data.length / props.maxXAxisTicks) - 1
 			: undefined;
+	const yAxisDomainMax = props.fitYAxisToData ? getYAxisDomainMax(props) : undefined;
 
 	const resolved: ResolvedProps = {
 		...props,
 		colorFor,
 		labelFormatter,
+		yAxisTickFormatter,
 		xAxisInterval,
+		yAxisDomainMax,
 		margin: props.title ? { ...props.margin, top: (props.margin?.top ?? 0) + 30 } : props.margin,
 		children: titleChild ? [titleChild, ...(props.children ?? [])] : props.children,
 	};
@@ -139,7 +145,32 @@ function buildResolved(props: BuildChartProps) {
 }
 
 type ResolvedProps = BuildChartProps &
-	Required<Pick<BuildChartProps, 'colorFor' | 'labelFormatter'>> & { xAxisInterval?: number };
+	Required<Pick<BuildChartProps, 'colorFor' | 'labelFormatter' | 'yAxisTickFormatter'>> & {
+		xAxisInterval?: number;
+		yAxisDomainMax?: number;
+	};
+
+function getYAxisDomainMax(props: BuildChartProps): number | undefined {
+	const isStacked = props.chartType === 'stacked_bar' || props.chartType === 'stacked_area';
+	let max = 0;
+
+	for (const item of props.data) {
+		if (isStacked) {
+			const total = props.series.reduce((sum, series) => sum + toNumber(item[series.data_key]), 0);
+			max = Math.max(max, total);
+		} else {
+			for (const series of props.series) {
+				max = Math.max(max, toNumber(item[series.data_key]));
+			}
+		}
+	}
+
+	return max > 0 ? max * 1.1 : undefined;
+}
+
+function toNumber(value: unknown): number {
+	return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
 
 function buildKpiCard(props: ResolvedProps) {
 	const { data, series } = props;
@@ -192,13 +223,22 @@ function buildBarChart(props: ResolvedProps) {
 		children,
 		margin,
 		xAxisInterval,
+		yAxisTickFormatter,
+		yAxisDomainMax,
 	} = props;
 	const isStacked = chartType === 'stacked_bar';
 
 	return (
 		<BarChart data={data} accessibilityLayer margin={margin}>
 			{showGrid && <CartesianGrid horizontal vertical={false} strokeDasharray='3 3' />}
-			<YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={12} tickFormatter={formatYAxisTick} />
+			<YAxis
+				tick={AXIS_TICK}
+				tickLine={false}
+				axisLine={false}
+				minTickGap={12}
+				tickFormatter={yAxisTickFormatter}
+				domain={yAxisDomainMax ? [0, yAxisDomainMax] : undefined}
+			/>
 			<XAxis
 				dataKey={xAxisKey}
 				type={xAxisType}
@@ -239,6 +279,8 @@ function buildAreaChart(props: ResolvedProps) {
 		children,
 		margin,
 		xAxisInterval,
+		yAxisTickFormatter,
+		yAxisDomainMax,
 	} = props;
 	const isStacked = chartType === 'stacked_area';
 
@@ -257,7 +299,14 @@ function buildAreaChart(props: ResolvedProps) {
 				})}
 			</defs>
 			{showGrid && <CartesianGrid horizontal vertical={false} strokeDasharray='3 3' />}
-			<YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={12} tickFormatter={formatYAxisTick} />
+			<YAxis
+				tick={AXIS_TICK}
+				tickLine={false}
+				axisLine={false}
+				minTickGap={12}
+				tickFormatter={yAxisTickFormatter}
+				domain={yAxisDomainMax ? [0, yAxisDomainMax] : undefined}
+			/>
 			<XAxis
 				dataKey={xAxisKey}
 				type={xAxisType}
@@ -287,7 +336,18 @@ function buildAreaChart(props: ResolvedProps) {
 }
 
 function buildScatterChart(props: ResolvedProps) {
-	const { data, xAxisKey, xAxisType, series, colorFor, showGrid, children, margin } = props;
+	const {
+		data,
+		xAxisKey,
+		xAxisType,
+		series,
+		colorFor,
+		showGrid,
+		children,
+		margin,
+		yAxisTickFormatter,
+		yAxisDomainMax,
+	} = props;
 
 	return (
 		<ScatterChart data={data} accessibilityLayer margin={margin}>
@@ -300,7 +360,14 @@ function buildScatterChart(props: ResolvedProps) {
 				axisLine={false}
 				minTickGap={12}
 			/>
-			<YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={12} tickFormatter={formatYAxisTick} />
+			<YAxis
+				tick={AXIS_TICK}
+				tickLine={false}
+				axisLine={false}
+				minTickGap={12}
+				tickFormatter={yAxisTickFormatter}
+				domain={yAxisDomainMax ? [0, yAxisDomainMax] : undefined}
+			/>
 			{children}
 			{series.map((s, i) => (
 				<Scatter
@@ -315,13 +382,13 @@ function buildScatterChart(props: ResolvedProps) {
 }
 
 function buildRadarChart(props: ResolvedProps) {
-	const { data, xAxisKey, series, colorFor, children, margin } = props;
+	const { data, xAxisKey, series, colorFor, children, margin, yAxisTickFormatter } = props;
 
 	return (
 		<RadarChart data={data} accessibilityLayer margin={margin}>
 			<PolarGrid />
 			<PolarAngleAxis dataKey={xAxisKey} tick={AXIS_TICK} />
-			<PolarRadiusAxis tick={AXIS_TICK} tickFormatter={formatYAxisTick} />
+			<PolarRadiusAxis tick={AXIS_TICK} tickFormatter={yAxisTickFormatter} />
 			{children}
 			{series.map((s, i) => (
 				<Radar
