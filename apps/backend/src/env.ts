@@ -99,6 +99,11 @@ const envSchema = z.object({
 	APP_VERSION: z.string().default('dev'),
 	APP_COMMIT: z.string().default('unknown'),
 	APP_BUILD_DATE: z.string().default(''),
+	UPDATE_CHECK_DISABLED: z
+		.enum(['true', 'false'])
+		.optional()
+		.default('true')
+		.transform((val) => val === 'true'),
 
 	NAO_DEFAULT_PROJECT_PATH: z.string().optional(),
 	NAO_MODE: z.enum(['self-hosted', 'cloud']).default('self-hosted'),

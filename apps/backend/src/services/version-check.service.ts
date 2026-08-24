@@ -13,12 +13,16 @@ let cachedResult: VersionCheckResult | null = null;
 let cachedAt = 0;
 
 export async function checkForUpdate(): Promise<VersionCheckResult> {
+	const currentVersion = env.APP_VERSION;
+	if (env.UPDATE_CHECK_DISABLED) {
+		return { currentVersion, latestVersion: null, updateAvailable: false };
+	}
+
 	const now = Date.now();
 	if (cachedResult && now - cachedAt < CACHE_TTL_MS) {
 		return cachedResult;
 	}
 
-	const currentVersion = env.APP_VERSION;
 	const latestVersion = await fetchLatestVersion();
 	const updateAvailable = latestVersion !== null && isNewerVersion(currentVersion, latestVersion);
 
