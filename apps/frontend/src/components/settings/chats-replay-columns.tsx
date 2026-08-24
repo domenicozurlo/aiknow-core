@@ -188,13 +188,6 @@ const compactTokenFormatter = new Intl.NumberFormat('en-US', {
 
 const exactTokenFormatter = new Intl.NumberFormat('en-US');
 
-const costFormatter = new Intl.NumberFormat('en-US', {
-	style: 'currency',
-	currency: 'USD',
-	minimumFractionDigits: 1,
-	maximumFractionDigits: 1,
-});
-
 function formatCompactTokens(value: number): string {
 	return compactTokenFormatter.format(value);
 }
@@ -203,8 +196,14 @@ function formatExactTokens(value: number): string {
 	return exactTokenFormatter.format(value);
 }
 
-function formatCost(value: number): string {
-	return costFormatter.format(value);
+export function formatCost(value: number): string {
+	const abs = Math.abs(value);
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+		minimumFractionDigits: abs > 0 && abs < 0.01 ? 4 : abs === 0 ? 0 : 2,
+		maximumFractionDigits: abs > 0 && abs < 0.01 ? 4 : 2,
+	}).format(value);
 }
 
 export function formatLastUpdate(value: number): string {

@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { formatCost } from './chats-replay-columns';
 import { ChatsReplayTable } from './chats-replay-table';
 
 import type { ColumnDef } from '@tanstack/react-table';
@@ -43,6 +44,17 @@ describe('ChatsReplayTable', () => {
 		expect(onRowClick).toHaveBeenCalledTimes(2);
 		expect(onRowClick).toHaveBeenCalledWith(chat);
 		expect(row.getAttribute('tabindex')).toBe('0');
+	});
+});
+
+describe('formatCost', () => {
+	it('keeps small non-zero costs visible', () => {
+		expect(formatCost(0.02965485)).toBe('$0.03');
+		expect(formatCost(0.0042)).toBe('$0.0042');
+	});
+
+	it('does not add decimals to an exact zero', () => {
+		expect(formatCost(0)).toBe('$0');
 	});
 });
 
