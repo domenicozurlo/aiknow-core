@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { ChevronDown } from 'lucide-react';
-import { USER_ROLES } from '@nao/shared/types';
+import { USER_ROLE_LABELS, USER_ROLES } from '@nao/shared/types';
 import type { UserRole } from '@nao/shared/types';
 
 import type { TeamMember } from './types';
@@ -14,6 +14,7 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useSsoRoleMapping } from '@/hooks/use-sso-role-mapping';
 
 interface EditMemberDialogProps {
 	open: boolean;
@@ -33,6 +34,8 @@ export function EditMemberDialog({
 	onSubmit,
 }: EditMemberDialogProps) {
 	const [error, setError] = useState('');
+	const { rolesManagedByIdp, providerName, isLoading } = useSsoRoleMapping();
+	const isRoleEditingDisabled = rolesManagedByIdp || isLoading;
 
 	const form = useForm({
 		defaultValues: {
@@ -48,7 +51,7 @@ export function EditMemberDialog({
 				await onSubmit({
 					userId: member.id,
 					name: value.name,
-					newRole: value.role,
+					newRole: isRoleEditingDisabled ? undefined : value.role,
 				});
 				onOpenChange(false);
 			} catch (err) {
@@ -104,9 +107,13 @@ export function EditMemberDialog({
 										Role
 									</label>
 									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<Button variant='outline' className='w-full justify-between'>
-												<span className='capitalize'>{field.state.value}</span>
+										<DropdownMenuTrigger asChild disabled={isRoleEditingDisabled}>
+											<Button
+												variant='outline'
+												className='w-full justify-between'
+												disabled={isRoleEditingDisabled}
+											>
+												<span>{USER_ROLE_LABELS[field.state.value]}</span>
 												<ChevronDown className='h-4 w-4 opacity-50' />
 											</Button>
 										</DropdownMenuTrigger>
@@ -117,11 +124,17 @@ export function EditMemberDialog({
 													onClick={() => field.handleChange(role)}
 													className={field.state.value === role ? 'bg-accent' : ''}
 												>
-													<span className='capitalize'>{role}</span>
+													<span>{USER_ROLE_LABELS[role]}</span>
 												</DropdownMenuItem>
 											))}
 										</DropdownMenuContent>
 									</DropdownMenu>
+									{rolesManagedByIdp && (
+										<p className='text-xs text-muted-foreground'>
+											Roles are assigned from {providerName} groups and refresh when the user
+											signs in again.
+										</p>
+									)}
 								</div>
 							)}
 						</form.Field>

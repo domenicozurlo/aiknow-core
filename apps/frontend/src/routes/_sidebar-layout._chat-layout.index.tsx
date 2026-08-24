@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { PlusIcon, Settings } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StoryItem } from '@/lib/stories-page';
 import { buildStoryItems } from '@/lib/stories-page';
 import { useSession } from '@/lib/auth-client';
@@ -9,7 +9,7 @@ import { capitalize, cn } from '@/lib/utils';
 import { setActiveProjectId } from '@/lib/active-project';
 import { ChatMessages } from '@/components/chat-messages/chat-messages';
 import { ViewerHome } from '@/components/viewer-home';
-import { useAgentContext } from '@/contexts/agent.provider';
+import { useAgentContext, useAgentMessages } from '@/contexts/agent.provider';
 import { usePermissions } from '@/hooks/use-permissions';
 import { SavedPromptSuggestions } from '@/components/chat-saved-prompt-suggestions';
 import { ChatInput } from '@/components/chat-input';
@@ -23,6 +23,9 @@ import { StoryCard } from '@/components/stories-groups';
 import { useResizeObserver } from '@/hooks/use-resize-observer';
 
 export const Route = createFileRoute('/_sidebar-layout/_chat-layout/')({
+	validateSearch: (search: Record<string, unknown>): { admin?: boolean } => ({
+		admin: search.admin === true || search.admin === 'true' ? true : undefined,
+	}),
 	component: RouteComponent,
 });
 
@@ -37,9 +40,20 @@ function RouteComponent() {
 function HomePage() {
 	const { data: session } = useSession();
 	const username = session?.user?.name;
-	const { messages } = useAgentContext();
+	const { setAdminMode } = useAgentContext();
+	const messages = useAgentMessages();
+	const { canChatWithNaoData } = usePermissions();
+	const { admin: adminSearch } = Route.useSearch();
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
+
+	useEffect(() => {
+		if (!canChatWithNaoData) {
+			return;
+		}
+		setAdminMode(adminSearch === true);
+	}, [canChatWithNaoData, adminSearch, setAdminMode]);
+
 	const project = useQuery(trpc.project.getCurrent.queryOptions());
 	const projects = useQuery(trpc.project.listForCurrentUser.queryOptions());
 	const isInMultipleProjects = (projects.data?.length ?? 0) > 1;

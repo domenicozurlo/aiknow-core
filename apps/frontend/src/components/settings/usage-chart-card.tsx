@@ -1,25 +1,25 @@
-import type { UsageRecord } from '@nao/backend/usage';
+import type { ReactNode } from 'react';
+import type { displayChart } from '@nao/shared/tools';
+import type { TotalUsageRecord, UsageRecord } from '@nao/backend/usage';
 import { ChartDisplay } from '@/components/tool-calls/display-chart';
-import { SettingsCard } from '@/components/ui/settings-card';
 
 export interface UsageChartCardProps {
 	title: string;
-	description: string;
 	isLoading: boolean;
 	isFetching: boolean;
 	isError: boolean;
-	data: UsageRecord[];
-	chartType: 'bar' | 'stacked_bar';
-	series: { data_key: string; color: string; label: string }[];
-	xAxisLabelFormatter: (value: string) => string;
-	yAxisTickFormatter?: (value: number) => string;
-	filters: React.ReactNode;
+	data: UsageRecord[] | TotalUsageRecord[];
+	chartType: 'bar' | 'stacked_bar' | 'kpi_card';
+	series: displayChart.SeriesConfig[];
+	xAxisLabelFormatter?: (value: string) => string;
+	valueFormatter?: (value: number) => string;
 	fitYAxisToData?: boolean;
+	titleAccessory?: ReactNode;
+	showLegend?: boolean;
 }
 
 export function UsageChartCard({
 	title,
-	description,
 	isLoading,
 	isFetching,
 	isError,
@@ -27,12 +27,13 @@ export function UsageChartCard({
 	chartType,
 	series,
 	xAxisLabelFormatter,
-	yAxisTickFormatter,
-	filters,
+	valueFormatter,
 	fitYAxisToData,
+	titleAccessory,
+	showLegend,
 }: UsageChartCardProps) {
 	return (
-		<SettingsCard title={title} titleSize='lg' description={description} action={filters}>
+		<div className='h-full min-w-0 rounded-xl p-4'>
 			{isError ? (
 				<div className='flex items-center justify-center py-12'>
 					<p className='text-muted-foreground'>Error loading usage data.</p>
@@ -48,18 +49,30 @@ export function UsageChartCard({
 			) : (
 				<div className={isFetching ? 'opacity-50' : ''}>
 					<ChartDisplay
+						title={title}
+						titleStyle='left'
 						data={data as unknown as Record<string, unknown>[]}
 						chartType={chartType}
 						xAxisKey='date'
 						xAxisType='category'
 						xAxisLabelFormatter={xAxisLabelFormatter}
-						yAxisTickFormatter={yAxisTickFormatter}
-						series={series}
-						showGrid={true}
+						valueFormatter={valueFormatter}
 						fitYAxisToData={fitYAxisToData}
+						series={series}
+						titleAccessory={titleAccessory}
+						showLegend={showLegend}
+						showGrid={true}
+						chartContainerClassName={
+							chartType === 'kpi_card'
+								? undefined
+								: 'max-lg:h-[200px] max-lg:max-h-[200px] h-[320px] max-h-[320px]'
+						}
+						chartContentClassName={
+							chartType === 'kpi_card' ? undefined : 'max-lg:min-h-0 max-lg:flex-1 max-lg:aspect-auto'
+						}
 					/>
 				</div>
 			)}
-		</SettingsCard>
+		</div>
 	);
 }

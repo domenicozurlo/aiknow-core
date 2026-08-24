@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from nao_core.commands.sync.providers.databases.context import DatabaseContext
-from nao_core.commands.sync.providers.databases.provider import _should_refresh_profiling
+from nao_core.commands.sync.providers.databases.provider import _should_refresh
 from nao_core.config.databases.base import ProfilingConfig, ProfilingRefreshPolicy
 
 
@@ -86,7 +86,7 @@ class TestDatabaseContext:
 
         config = ProfilingConfig(refresh_policy=ProfilingRefreshPolicy.INTERVAL, interval_days=1)
 
-        assert _should_refresh_profiling(profiling_file, config) is False
+        assert _should_refresh(profiling_file, config) is False
 
     def test_should_refresh_when_stale(self, tmp_path):
         profiling_file = tmp_path / "profiling.md"
@@ -95,14 +95,14 @@ class TestDatabaseContext:
 
         config = ProfilingConfig(refresh_policy=ProfilingRefreshPolicy.INTERVAL, interval_days=1)
 
-        assert _should_refresh_profiling(profiling_file, config) is True
+        assert _should_refresh(profiling_file, config) is True
 
     def test_should_refresh_when_file_missing(self, tmp_path):
         profiling_file = tmp_path / "profiling.md"
 
         config = ProfilingConfig(refresh_policy=ProfilingRefreshPolicy.ONCE, interval_days=1)
 
-        assert _should_refresh_profiling(profiling_file, config) is True
+        assert _should_refresh(profiling_file, config) is True
 
     def test_should_not_refresh_once_when_file_exists(self, tmp_path):
         profiling_file = tmp_path / "profiling.md"
@@ -110,7 +110,7 @@ class TestDatabaseContext:
 
         config = ProfilingConfig(refresh_policy=ProfilingRefreshPolicy.ONCE, interval_days=1)
 
-        assert _should_refresh_profiling(profiling_file, config) is False
+        assert _should_refresh(profiling_file, config) is False
 
     def test_interval_days_valid_with_interval_policy(self):
         config = ProfilingConfig(
@@ -186,3 +186,18 @@ class TestDatabaseContext:
     def test_column_count_uses_filtered_columns(self):
         ctx, _ = self._make_context(exclude_columns=["*.name"])
         assert ctx.column_count() == 1
+
+
+class TestNormalizeType:
+    def test_strips_not_null_suffix(self):
+        assert DatabaseContext._normalize_type("int64 NOT NULL") == "int64"
+
+    def test_int64_is_reported_as_is(self):
+        assert DatabaseContext._normalize_type("int64") == "int64"
+
+    def test_parameterized_string_collapses_to_string(self):
+        assert DatabaseContext._normalize_type("String(255)") == "string"
+
+    def test_other_types_pass_through(self):
+        assert DatabaseContext._normalize_type("Int64") == "Int64"
+        assert DatabaseContext._normalize_type("timestamp('UTC')") == "timestamp('UTC')"

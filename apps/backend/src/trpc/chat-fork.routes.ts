@@ -8,7 +8,8 @@ import * as sharedStoryQueries from '../queries/shared-story.queries';
 import * as storyQueries from '../queries/story.queries';
 import * as storyFolderQueries from '../queries/story-folder.queries';
 import { compactionService } from '../services/compaction';
-import type { ForkMetadata, UIMessage } from '../types/chat';
+import type { ForkMetadata, UIMessage, UIMessagePart } from '../types/chat';
+import { logAnalyticsEvent } from '../utils/analytics-event';
 import { buildQueryDataParts, pinStoryMessageToChat } from '../utils/chat-message-story';
 import { canSendProcedure, projectProtectedProcedure, protectedProcedure } from './trpc';
 
@@ -68,6 +69,15 @@ export const chatForkRoutes = {
 				version: latestVersion?.version ?? 1,
 			});
 
+			logAnalyticsEvent({
+				projectId: ctx.project.id,
+				type: 'fork',
+				assetType: 'story',
+				actorUserId: ctx.user.id,
+				storyId: story.id,
+				metadata: { type: 'fork', resultId: chat.id, scope: 'full', versionNumber: story.version },
+			});
+
 			return { chatId: chat.id };
 		}),
 
@@ -101,7 +111,15 @@ async function forkSharedChat(
 		messages,
 	);
 
-	await copyStoriesToFork(share.chatId, savedChat.id);
+	logAnalyticsEvent({
+		projectId: share.projectId,
+		type: 'fork',
+		assetType: 'chat',
+		actorUserId: userId,
+		chatId: share.chatId,
+		sharedChatId: share.id,
+		metadata: { type: 'fork', resultId: savedChat.id, scope: selection ? 'selection' : 'full' },
+	});
 
 	return { chatId: savedChat.id };
 }
@@ -119,16 +137,24 @@ async function forkSharedStoryItem(
 		: { type: 'story', id: share.storyId, title: share.title, authorName: share.authorName };
 
 	if (selection) {
-		const rawMessages = await chatQueries.getChatMessages(share.chatId!);
+		const [rawMessages, queryData] = await Promise.all([
+			chatQueries.getChatMessages(share.chatId!),
+			sharedStoryQueries.getQueryDataFromCode(share.chatId!, share.code),
+		]);
 		const seededMessages = compactionService.useLastCompaction(rawMessages);
-		const messages = [...seededMessages, buildSelectionContextMessage(share.title, selection)];
+		const messages = [
+			...buildQueryDataMessages(queryData),
+			buildStoryContextMessage(share.slug, share.title, share.code),
+			...seededMessages,
+			buildSelectionContextMessage(share.title, selection),
+		];
 
 		const chat = await chatQueries.createForkedChat(
 			{ projectId, userId, title: share.title, forkMetadata },
 			messages,
 		);
 
-		await copyStoriesToFork(share.chatId!, chat.id);
+		logStoryFork(share, userId, chat.id, 'selection');
 		return { chatId: chat.id };
 	}
 
@@ -138,7 +164,26 @@ async function forkSharedStoryItem(
 	const chat = await chatQueries.createForkedChat({ projectId, userId, title: share.title, forkMetadata }, messages);
 
 	await createStoryInFork(chat.id, share.slug, share.title, share.code, { userId, projectId });
+	logStoryFork(share, userId, chat.id, 'full');
 	return { chatId: chat.id };
+}
+
+function logStoryFork(
+	share: { projectId: string; storyId: string; chatId: string | null; id: string; version: number },
+	userId: string,
+	resultChatId: string,
+	scope: 'full' | 'selection',
+): void {
+	logAnalyticsEvent({
+		projectId: share.projectId,
+		type: 'fork',
+		assetType: 'story',
+		actorUserId: userId,
+		storyId: share.storyId,
+		chatId: share.chatId,
+		sharedStoryId: share.id,
+		metadata: { type: 'fork', resultId: resultChatId, scope, versionNumber: share.version },
+	});
 }
 
 async function resolveSharedChat(shareId: string, userId: string) {
@@ -240,26 +285,20 @@ async function createStoryInFork(
 	}
 }
 
-async function copyStoriesToFork(sourceChatId: string, forkChatId: string): Promise<void> {
-	const stories = await storyQueries.listStoriesInChat(sourceChatId);
-	if (stories.length === 0) {
-		return;
-	}
-
-	await Promise.all(
-		stories.map(async ({ slug }) => {
-			const latest = await storyQueries.getLatestVersionByChatAndSlug(sourceChatId, slug);
-			if (!latest) {
-				return;
-			}
-			await storyQueries.createStoryVersion({
-				chatId: forkChatId,
-				slug,
-				title: latest.title,
-				code: latest.code,
-				action: 'create',
-				source: 'assistant',
-			});
-		}),
-	);
+function buildStoryContextMessage(slug: string, title: string, code: string): Omit<UIMessage, 'id'> {
+	return {
+		role: 'assistant',
+		parts: [
+			{
+				type: 'tool-story',
+				toolCallId: crypto.randomUUID(),
+				toolName: 'story',
+				state: 'output-available',
+				input: { action: 'create', id: slug, title, code },
+				output: { _version: '1', success: true, id: slug, version: 1, code, title },
+				errorText: undefined,
+				providerExecuted: false,
+			} as UIMessagePart,
+		],
+	};
 }

@@ -90,6 +90,17 @@ export const toKey = (value: string) => {
 	return hashValue(value);
 };
 
+/**
+ * Resolves the tooltip header label for a pie slice from its Recharts payload.
+ *
+ * Pie tooltips have no axis label, so the header must come from the hovered
+ * slice's category name (the `nameKey` value) rather than the value data key.
+ */
+export function resolvePieTooltipLabel(payload?: readonly { name?: unknown }[]): string {
+	const name = payload?.[0]?.name;
+	return name == null ? '' : String(name);
+}
+
 /** Counts the successfully rendered `display_chart` tool calls across a conversation. */
 export function countDisplayCharts(messages: UIMessage[]): number {
 	let count = 0;

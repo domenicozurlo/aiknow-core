@@ -1,19 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
-import Fuse from 'fuse.js';
 import { Folder, Search, X } from 'lucide-react';
 
-import type { FuseResult } from 'fuse.js';
 import type { ProjectOption } from '@/components/project-selector';
-import type { SettingsSearchEntry } from '@/components/settings-search-index';
 
 import { ProjectSelector } from '@/components/project-selector';
-import { settingsSearchIndex } from '@/components/settings-search-index';
 import { Badge } from '@/components/ui/badge';
+import { useSettingsSearch } from '@/hooks/use-settings-search';
 import { cn, hideIf } from '@/lib/utils';
 
 interface NavContext {
 	isAdmin: boolean;
+	isContextAdmin: boolean;
 	isCloud: boolean;
 	hasLicense: boolean;
 	isViewer: boolean;
@@ -23,6 +21,7 @@ interface NavContext {
 interface NavItem {
 	label: string;
 	to?: string;
+	search?: { admin?: boolean };
 	visible?: (ctx: NavContext) => boolean;
 	disabled?: (ctx: NavContext) => boolean;
 	type?: 'divider' | 'item';
@@ -50,36 +49,67 @@ const settingsNavItems: NavItem[] = [
 		visible: ({ isViewer, isInMultipleProjects }) => !isViewer || isInMultipleProjects,
 	},
 	{
+		label: 'Git',
+		to: '/settings/git',
+		visible: ({ isAdmin, isContextAdmin }) => isAdmin || isContextAdmin,
+	},
+	{
 		label: 'MCP Endpoint',
 		to: '/settings/mcp-endpoint',
 		visible: ({ isViewer }) => !isViewer,
 	},
 	{
-		label: 'Observability',
-		type: 'divider',
-		visible: ({ isAdmin }) => isAdmin,
+		label: 'Storage',
+		to: '/settings/storage',
+		visible: ({ isViewer, isCloud }) => !isViewer && !isCloud,
 	},
 	{
-		label: 'Usage & costs',
+		label: 'Observability',
+		type: 'divider',
+		visible: ({ isAdmin, isContextAdmin }) => isAdmin || isContextAdmin,
+	},
+	{
+		label: 'Chat with nao data',
+		to: '/',
+		search: { admin: true },
+		visible: ({ isAdmin, isContextAdmin }) => isAdmin || isContextAdmin,
+	},
+	{
+		label: 'Usage, costs & replay',
 		to: '/settings/usage',
 		visible: ({ isAdmin }) => isAdmin,
 	},
 	{
-		label: 'Chats Replay',
-		to: '/settings/chats-replay',
-		visible: ({ isAdmin }) => isAdmin,
+		label: 'Chats replay',
+		to: '/settings/usage',
+		visible: ({ isAdmin, isContextAdmin }) => !isAdmin && isContextAdmin,
+	},
+	{
+		label: 'Server logs',
+		to: '/settings/logs',
+		visible: ({ isAdmin, isCloud }) => isAdmin && !isCloud,
+	},
+	{
+		label: 'Context',
+		type: 'divider',
+		visible: ({ isViewer }) => !isViewer,
 	},
 	{
 		label: 'Recommendations',
 		to: '/settings/recommendations',
-		visible: ({ isAdmin }) => isAdmin,
+		visible: ({ isAdmin, isContextAdmin }) => isAdmin || isContextAdmin,
 		badge: 'Beta',
 		badgeVariant: 'new',
 	},
 	{
-		label: 'Logs',
-		to: '/settings/logs',
-		visible: ({ isAdmin, isCloud }) => isAdmin && !isCloud,
+		label: 'File Explorer',
+		to: '/settings/context-explorer',
+		visible: ({ isAdmin, isContextAdmin }) => isAdmin || isContextAdmin,
+	},
+	{
+		label: 'Memory',
+		to: '/settings/memory',
+		visible: ({ isViewer }) => !isViewer,
 	},
 	// Enterprise menu intentionally hidden.
 	// {
@@ -97,26 +127,12 @@ const settingsNavItems: NavItem[] = [
 	// 	to: '/settings/white-label',
 	// 	visible: ({ isAdmin, isCloud }) => isAdmin && !isCloud,
 	// },
-	{
-		label: 'Context',
-		type: 'divider',
-		visible: ({ isViewer }) => !isViewer,
-	},
-	{
-		label: 'Memory',
-		to: '/settings/memory',
-		visible: ({ isViewer }) => !isViewer,
-	},
-	{
-		label: 'File Explorer',
-		to: '/settings/context-explorer',
-		visible: ({ isAdmin }) => isAdmin,
-	},
 ];
 
 interface SidebarSettingsNavProps {
 	isCollapsed: boolean;
 	isAdmin: boolean;
+	isContextAdmin: boolean;
 	isViewer: boolean;
 	isCloud: boolean;
 	hasLicense: boolean;
@@ -125,20 +141,10 @@ interface SidebarSettingsNavProps {
 	onProjectChange: (projectId: string) => void;
 }
 
-function dedupeByPage(results: FuseResult<SettingsSearchEntry>[]) {
-	const seen = new Set<string>();
-	return results.filter((r) => {
-		if (seen.has(r.item.page)) {
-			return false;
-		}
-		seen.add(r.item.page);
-		return true;
-	});
-}
-
 export function SidebarSettingsNav({
 	isCollapsed,
 	isAdmin,
+	isContextAdmin,
 	isViewer,
 	isCloud,
 	hasLicense,
@@ -152,8 +158,14 @@ export function SidebarSettingsNav({
 
 	const navItems = settingsNavItems.filter(
 		(item) =>
-			item.visible?.({ isAdmin, isCloud, isViewer, isInMultipleProjects: projects.length > 1, hasLicense }) ??
-			true,
+			item.visible?.({
+				isAdmin,
+				isContextAdmin,
+				isCloud,
+				isViewer,
+				isInMultipleProjects: projects.length > 1,
+				hasLicense,
+			}) ?? true,
 	);
 	const canSwitchProjects = projects.length > 1 && !!currentProjectId;
 
@@ -173,32 +185,7 @@ export function SidebarSettingsNav({
 		return () => document.removeEventListener('keydown', handleSlashKey);
 	}, [isCollapsed, isViewer]);
 
-	const fuse = useMemo(() => {
-		const entries = settingsSearchIndex.filter(
-			(e) =>
-				(!e.adminOnly || isAdmin) &&
-				(!e.cloudHidden || !isCloud) &&
-				(!e.cloudOnly || isCloud) &&
-				(!e.licenseRequired || hasLicense),
-		);
-		return new Fuse(entries, {
-			keys: [
-				{ name: 'title', weight: 0.4 },
-				{ name: 'pageLabel', weight: 0.25 },
-				{ name: 'description', weight: 0.2 },
-				{ name: 'keywords', weight: 0.15 },
-			],
-			threshold: 0.4,
-			includeScore: true,
-		});
-	}, [isAdmin, isCloud, hasLicense]);
-
-	const results = useMemo(() => {
-		if (query.length < 2) {
-			return [];
-		}
-		return dedupeByPage(fuse.search(query, { limit: 8 }));
-	}, [query, fuse]);
+	const results = useSettingsSearch(query);
 
 	const isSearching = query.length >= 2;
 
@@ -208,7 +195,7 @@ export function SidebarSettingsNav({
 			inputRef.current?.blur();
 		} else if (e.key === 'Enter' && results.length > 0) {
 			setQuery('');
-			navigate({ to: results[0].item.page });
+			navigate({ to: results[0].page });
 		}
 	};
 
@@ -258,18 +245,18 @@ export function SidebarSettingsNav({
 					) : (
 						results.map((result) => (
 							<Link
-								key={result.item.page + result.item.title}
-								to={result.item.page}
+								key={result.page + result.title}
+								to={result.page}
 								onClick={() => setQuery('')}
 								className={cn(
 									'flex flex-col gap-0.5 px-3 py-2 text-sm rounded-md transition-colors',
 									'hover:bg-sidebar-accent hover:text-foreground',
 								)}
 							>
-								<span className='font-medium truncate'>{result.item.title}</span>
+								<span className='font-medium truncate'>{result.title}</span>
 								<span className='text-xs text-muted-foreground truncate'>
-									{result.item.pageLabel}
-									{result.item.section ? ` · ${result.item.section}` : ''}
+									{result.pageLabel}
+									{result.section ? ` · ${result.section}` : ''}
 								</span>
 							</Link>
 						))
@@ -293,6 +280,7 @@ export function SidebarSettingsNav({
 						const isDisabled =
 							item.disabled?.({
 								isAdmin,
+								isContextAdmin,
 								isCloud,
 								isViewer,
 								isInMultipleProjects: projects.length > 1,
@@ -323,6 +311,23 @@ export function SidebarSettingsNav({
 										{item.label}
 										{badge}
 									</span>
+								) : item.search ? (
+									<Link
+										to='/'
+										search={item.search}
+										className={cn(
+											'flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors whitespace-nowrap',
+										)}
+										activeProps={{
+											className: cn('bg-sidebar-accent text-foreground font-medium'),
+										}}
+										inactiveProps={{
+											className: cn('hover:bg-sidebar-accent hover:text-foreground'),
+										}}
+									>
+										{item.label}
+										{badge}
+									</Link>
 								) : (
 									<Link
 										to={item.to}

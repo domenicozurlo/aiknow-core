@@ -1,3 +1,5 @@
+import './instrumentation';
+
 import formbody from '@fastify/formbody';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
@@ -14,6 +16,10 @@ import { runMigrations } from './db/migrate';
 import { env, isCloud } from './env';
 import { AUTOMATION_JOB_NAME, automationHandler } from './handlers/automation.handler';
 import {
+	CONTEXT_BRANCH_CLEANUP_JOB_NAME,
+	contextBranchCleanupHandler,
+} from './handlers/context-branch-cleanup.handler';
+import {
 	CONTEXT_RECOMMENDATIONS_JOB_NAME,
 	contextRecommendationsHandler,
 	ensureContextRecommendationsSchedules,
@@ -21,11 +27,15 @@ import {
 import { LOG_CLEANUP_JOB_NAME, logCleanupHandler, runLogCleanup } from './handlers/log-cleanup.handler';
 import { MCP_QUERY_DATA_CLEANUP_JOB_NAME, mcpQueryDataCleanupHandler } from './handlers/mcp-query-data-cleanup.handler';
 import { STORY_REFRESH_JOB_NAME, storyRefreshHandler } from './handlers/story-refresh.handler';
+import { flushTelemetry } from './instrumentation';
 import { mcpServerRoutes } from './mcp/routes';
 import { ensureOrganizationSetup } from './queries/organization.queries';
 import { agentRoutes } from './routes/agent';
+import { analyticsRoutes } from './routes/analytics';
+import { attachmentRoutes } from './routes/attachment';
 import { authRoutes } from './routes/auth';
 import { authErrorRedirectRoutes } from './routes/auth-error-redirect';
+import { automationWebhookRoutes } from './routes/automation-webhook';
 import { brandingRoutes } from './routes/branding';
 import { chartRoutes } from './routes/chart';
 import { contextAssetRoutes } from './routes/context-assets';
@@ -33,8 +43,12 @@ import { contextFileRoutes } from './routes/context-files';
 import { deployRoutes } from './routes/deploy';
 import { embedStoryDownloadRoutes } from './routes/embed-story-download';
 import { githubRoutes } from './routes/github';
+import { gitlabRoutes } from './routes/gitlab';
 import { imageRoutes } from './routes/image';
+import { mapBoundariesRoutes } from './routes/map-boundaries';
+import { mcpOAuthRoutes } from './routes/mcp-oauth';
 import { slackRoutes } from './routes/slack';
+import { ssoRoutes } from './routes/sso';
 import { teamsRoutes } from './routes/teams';
 import { telegramRoutes } from './routes/telegram';
 import { testRoutes } from './routes/test';
@@ -48,6 +62,7 @@ import { slackService } from './services/slack';
 import { TrpcRouter, trpcRouter } from './trpc/router';
 import { createContext } from './trpc/trpc';
 import { BudgetExceededError, HandlerError } from './utils/error';
+import { closeBrowser } from './utils/headless-browser';
 import { logger } from './utils/logger';
 
 // Get the directory of the current module (works in both dev and compiled)
@@ -152,12 +167,24 @@ app.register(agentRoutes, {
 	prefix: '/api/agent',
 });
 
+app.register(attachmentRoutes, {
+	prefix: '/api/attachments',
+});
+
+app.register(analyticsRoutes, {
+	prefix: '/api/analytics',
+});
+
 app.register(testRoutes, {
 	prefix: '/api/test',
 });
 
 app.register(chartRoutes, {
 	prefix: '/c',
+});
+
+app.register(mapBoundariesRoutes, {
+	prefix: '/api/map-boundaries',
 });
 
 app.register(imageRoutes, {
@@ -188,6 +215,10 @@ app.register(authRoutes, {
 	prefix: '/api',
 });
 
+app.register(ssoRoutes, {
+	prefix: '/api',
+});
+
 app.register(slackRoutes, {
 	prefix: '/api/webhooks/slack',
 });
@@ -208,8 +239,20 @@ app.register(deployRoutes, {
 	prefix: '/api',
 });
 
+app.register(automationWebhookRoutes, {
+	prefix: '/api',
+});
+
 app.register(githubRoutes, {
 	prefix: '/api/github',
+});
+
+app.register(gitlabRoutes, {
+	prefix: '/api/gitlab',
+});
+
+app.register(mcpOAuthRoutes, {
+	prefix: '/api/mcp-oauth',
 });
 
 app.register(mcpServerRoutes, {
@@ -305,16 +348,21 @@ if (staticRoot) {
 		prefix: '/',
 		wildcard: false,
 	});
-
-	// SPA fallback: serve index.html for all non-API routes
-	app.setNotFoundHandler((request, reply) => {
-		if (isReservedBackendPath(request.url)) {
-			reply.status(404).send({ error: 'Not found' });
-		} else {
-			reply.sendFile('index.html');
-		}
-	});
 }
+
+// SPA fallback: serve index.html for all non-API routes.
+// In dev mode without a built frontend, redirect to the Vite dev server.
+app.setNotFoundHandler((request, reply) => {
+	if (isReservedBackendPath(request.url)) {
+		reply.status(404).send({ error: 'Not found' });
+	} else if (staticRoot) {
+		reply.sendFile('index.html');
+	} else if (isDev) {
+		reply.redirect(`http://localhost:3000${request.url}`);
+	} else {
+		reply.status(404).send({ error: 'Not found' });
+	}
+});
 
 export const startServer = async (opts: { port: number; host: string }) => {
 	if (isCloud) {
@@ -353,6 +401,13 @@ export const startServer = async (opts: { port: number; host: string }) => {
 		uniqueKey: MCP_QUERY_DATA_CLEANUP_JOB_NAME,
 	});
 
+	registerJob(CONTEXT_BRANCH_CLEANUP_JOB_NAME, contextBranchCleanupHandler);
+	await ensureRecurring({
+		name: CONTEXT_BRANCH_CLEANUP_JOB_NAME,
+		cron: '0 5 * * *',
+		uniqueKey: CONTEXT_BRANCH_CLEANUP_JOB_NAME,
+	});
+
 	if (env.BETA_CONTEXT_RECOMMENDATIONS_ENABLED) {
 		registerJob(CONTEXT_RECOMMENDATIONS_JOB_NAME, contextRecommendationsHandler);
 		try {
@@ -377,6 +432,8 @@ export const startServer = async (opts: { port: number; host: string }) => {
 	posthog.capture(undefined, PostHogEvent.ServerStarted, { ...opts, address });
 
 	const handleShutdown = async () => {
+		await closeBrowser();
+		await flushTelemetry();
 		await posthog.shutdown();
 		process.exit(0);
 	};

@@ -99,8 +99,16 @@ export type NewContextRecommendationRun = typeof sqliteSchema.contextRecommendat
 export type DBContextRecommendationConfig = typeof sqliteSchema.contextRecommendationConfig.$inferSelect;
 export type NewContextRecommendationConfig = typeof sqliteSchema.contextRecommendationConfig.$inferInsert;
 
+export type DBContextBranchOwnership = typeof sqliteSchema.contextBranchOwnership.$inferSelect;
+export type NewContextBranchOwnership = typeof sqliteSchema.contextBranchOwnership.$inferInsert;
+
 export type DBContextRecommendation = typeof sqliteSchema.contextRecommendation.$inferSelect;
 export type NewContextRecommendation = typeof sqliteSchema.contextRecommendation.$inferInsert;
+
+export type DBContextRecommendationLinkedFeedback =
+	typeof sqliteSchema.contextRecommendationLinkedFeedback.$inferSelect;
+export type NewContextRecommendationLinkedFeedback =
+	typeof sqliteSchema.contextRecommendationLinkedFeedback.$inferInsert;
 
 export type DBLog = typeof sqliteSchema.log.$inferSelect;
 export type NewLog = typeof sqliteSchema.log.$inferInsert;
@@ -113,6 +121,9 @@ export type NewMcpQueryData = typeof sqliteSchema.mcpQueryData.$inferInsert;
 
 export type DBMcpChartEmbed = typeof sqliteSchema.mcpChartEmbed.$inferSelect;
 export type NewMcpChartEmbed = typeof sqliteSchema.mcpChartEmbed.$inferInsert;
+
+export type DBMcpMapEmbed = typeof sqliteSchema.mcpMapEmbed.$inferSelect;
+export type NewMcpMapEmbed = typeof sqliteSchema.mcpMapEmbed.$inferInsert;
 
 export type DBMessageImage = typeof sqliteSchema.messageImage.$inferSelect;
 export type NewMessageImage = typeof sqliteSchema.messageImage.$inferInsert;
@@ -133,10 +144,19 @@ export type NewBrandingConfig = typeof sqliteSchema.brandingConfig.$inferInsert;
 export type DBFavorite = typeof sqliteSchema.favorite.$inferSelect;
 export type NewFavorite = typeof sqliteSchema.favorite.$inferInsert;
 
+export type DBAnalyticsEvent = typeof sqliteSchema.analyticsEvent.$inferSelect;
+export type NewAnalyticsEvent = typeof sqliteSchema.analyticsEvent.$inferInsert;
+
 export type DBStoryFolder = typeof sqliteSchema.storyFolder.$inferSelect;
 export type NewStoryFolder = typeof sqliteSchema.storyFolder.$inferInsert;
 
 export type DBStoryFolderItem = typeof sqliteSchema.storyFolderItem.$inferSelect;
 export type NewStoryFolderItem = typeof sqliteSchema.storyFolderItem.$inferInsert;
+
+export type DBMcpOAuthClient = typeof sqliteSchema.mcpOAuthClient.$inferSelect;
+export type NewMcpOAuthClient = typeof sqliteSchema.mcpOAuthClient.$inferInsert;
+
+export type DBMcpUserToken = typeof sqliteSchema.mcpUserToken.$inferSelect;
+export type NewMcpUserToken = typeof sqliteSchema.mcpUserToken.$inferInsert;
 
 export default allSchema as typeof sqliteSchema;

@@ -13,6 +13,7 @@ import {
 	RefreshCw,
 	RotateCcw,
 	Save,
+	ScanText,
 	Star,
 	Upload,
 	X,
@@ -21,6 +22,7 @@ import { memo, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { StorySummary } from '@/lib/story.utils';
 import type { StoryViewMode } from './story-viewer.types';
+import type { StoryRefreshFailure } from '@/components/story-page-header';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useToggleFavorite } from '@/hooks/use-toggle-favorite';
 import { StoryDownload } from '@/components/story-download';
@@ -33,7 +35,8 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Switch } from '@/components/ui/switch';
+import { SwitchIndicator } from '@/components/ui/switch';
+import { LiveStoryTimestamp, StoryRefreshFailureBanner } from '@/components/story-page-header';
 import { cn } from '@/lib/utils';
 
 export interface StoryHeaderProps {
@@ -42,6 +45,7 @@ export interface StoryHeaderProps {
 	storySlug: string;
 	storyId?: string | null;
 	shareId?: string | null;
+	shareType?: 'chat' | 'story' | null;
 	allStories: StorySummary[];
 	onSwitchStory: (id: string) => void;
 	viewMode: StoryViewMode;
@@ -55,9 +59,11 @@ export interface StoryHeaderProps {
 	onRestore: () => void;
 	onSave: () => void;
 	onShare: () => void;
+	onOpenAnalytics: () => void;
 	onEnlarge: () => void;
 	isShared: boolean;
 	isAgentRunning: boolean;
+	isSaving?: boolean;
 	isReadonlyMode: boolean;
 	isLive: boolean;
 	isRefreshing: boolean;
@@ -66,6 +72,8 @@ export interface StoryHeaderProps {
 	onClose: () => void;
 	isCodeDirty?: boolean;
 	isCodeValid?: boolean;
+	cachedAt?: string | Date | null;
+	lastRefreshFailure?: StoryRefreshFailure | null;
 }
 
 export const StoryHeader = memo(function StoryHeader({
@@ -74,6 +82,7 @@ export const StoryHeader = memo(function StoryHeader({
 	storySlug,
 	storyId,
 	shareId,
+	shareType,
 	allStories,
 	onSwitchStory,
 	viewMode,
@@ -87,9 +96,11 @@ export const StoryHeader = memo(function StoryHeader({
 	onRestore,
 	onSave,
 	onShare,
+	onOpenAnalytics,
 	onEnlarge,
 	isShared,
 	isAgentRunning,
+	isSaving = false,
 	isReadonlyMode,
 	isLive,
 	isRefreshing,
@@ -98,6 +109,8 @@ export const StoryHeader = memo(function StoryHeader({
 	onClose,
 	isCodeDirty = false,
 	isCodeValid = true,
+	cachedAt,
+	lastRefreshFailure,
 }: StoryHeaderProps) {
 	const isMobile = useIsMobile();
 	const { toggle: toggleFavorite, isPending: isFavoritePending } = useToggleFavorite('story');
@@ -195,8 +208,10 @@ export const StoryHeader = memo(function StoryHeader({
 			chatId={chatId}
 			storySlug={storySlug}
 			shareId={shareId ?? undefined}
+			shareType={shareType ?? undefined}
 			isOwner={!isReadonlyMode}
 			isAgentRunning={isAgentRunning}
+			isSaving={isSaving}
 			versionNumber={versionNumber}
 		/>
 	);
@@ -224,36 +239,45 @@ export const StoryHeader = memo(function StoryHeader({
 
 	const liveControls = !isReadonlyMode && (
 		<>
-			{isLive && (
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Button
-							variant='ghost'
-							size='icon-sm'
-							onClick={onRefreshData}
-							disabled={isRefreshing}
-							aria-label='Refresh data'
-						>
-							{isRefreshing ? (
-								<Loader2 className='size-3 animate-spin' strokeWidth={2.25} />
-							) : (
-								<RefreshCw className='size-3' strokeWidth={2.25} />
-							)}
-						</Button>
-					</TooltipTrigger>
-					<TooltipContent>Refresh data</TooltipContent>
-				</Tooltip>
-			)}
 			<Tooltip>
 				<TooltipTrigger asChild>
-					<div className='flex items-center gap-2'>
+					<button
+						type='button'
+						onClick={onOpenLiveSettings}
+						disabled={isAgentRunning}
+						className='flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 border hover:bg-secondary rounded-full px-2 py-0.75'
+					>
 						<Activity className='size-3.5 text-foreground' strokeWidth={2.25} />
 						<span className='text-xs font-medium'>Live story</span>
-						<Switch checked={isLive} onCheckedChange={onOpenLiveSettings} disabled={isAgentRunning} />
-					</div>
+						<SwitchIndicator checked={isLive} />
+					</button>
 				</TooltipTrigger>
 				<TooltipContent>{isLive ? 'Live story settings' : 'Enable live mode'}</TooltipContent>
 			</Tooltip>
+			{isLive && (
+				<>
+					{cachedAt && <LiveStoryTimestamp cachedAt={cachedAt} />}
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant='ghost'
+								size='icon-sm'
+								className='hover:rounded-full'
+								onClick={onRefreshData}
+								disabled={isRefreshing}
+								aria-label='Refresh data'
+							>
+								{isRefreshing ? (
+									<Loader2 className='size-3 animate-spin' strokeWidth={2.25} />
+								) : (
+									<RefreshCw className='size-3' strokeWidth={2.25} />
+								)}
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>Refresh data</TooltipContent>
+					</Tooltip>
+				</>
+			)}
 		</>
 	);
 
@@ -269,6 +293,10 @@ export const StoryHeader = memo(function StoryHeader({
 					{isShared ? <Globe className='text-primary' strokeWidth={2.25} /> : <Upload strokeWidth={2.25} />}
 					<span>Share</span>
 				</DropdownMenuItem>
+				<DropdownMenuItem onSelect={onOpenAnalytics}>
+					<ScanText className='size-3' />
+					<span>Analytics</span>
+				</DropdownMenuItem>
 				<DropdownMenuItem onSelect={onEnlarge}>
 					<Maximize2 strokeWidth={2.25} />
 					<span>Expand</span>
@@ -278,7 +306,7 @@ export const StoryHeader = memo(function StoryHeader({
 	);
 
 	return (
-		<div className='shrink-0'>
+		<div className='shrink-0' data-selection-ignore>
 			{isMobile ? (
 				<>
 					<div className='flex items-center gap-2 border-b px-3 py-2'>
@@ -324,6 +352,7 @@ export const StoryHeader = memo(function StoryHeader({
 				</div>
 			)}
 
+			{lastRefreshFailure && <StoryRefreshFailureBanner failure={lastRefreshFailure} />}
 			{showSubHeader && (
 				<div className='flex items-center justify-between border-b bg-muted/40 px-4 py-2'>
 					{viewMode === 'edit' ? (

@@ -1,5 +1,5 @@
 {
-  "id": "68facd15-b345-4b96-89a7-5d605c4f3fa2",
+  "id": "c431202d-f8e5-4edf-b7a6-c4c6eb96125d",
   "prevId": "2b805e79-ea51-401e-841b-5dc2e8d766af",
   "version": "7",
   "dialect": "postgresql",
@@ -1196,6 +1196,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "version_group_id": {
+          "name": "version_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source": {
           "name": "source",
           "type": "text",
@@ -1291,6 +1297,21 @@
           "columns": [
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "chat_message_versionGroupId_idx": {
+          "name": "chat_message_versionGroupId_idx",
+          "columns": [
+            {
+              "expression": "version_group_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

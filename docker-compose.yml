@@ -39,6 +39,13 @@ services:
             OPENAI_API_KEY: ${OPENAI_API_KEY}
 
             # =================================================================
+            # Langfuse LLM tracing (optional)
+            # =================================================================
+            LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+            LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+            LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
+
+            # =================================================================
             # Database for nao chat history
             # =================================================================
             DB_URI: postgres://${POSTGRES_USER:-nao}:${POSTGRES_PASSWORD:-nao}@postgres:5432/${POSTGRES_DB:-nao}
@@ -50,10 +57,11 @@ services:
             # NAO_CONTEXT_SOURCE: local
             # NAO_DEFAULT_PROJECT_PATH: /app/example
 
-            # Option B: Git mode - uncomment and configure these instead:
-            NAO_CONTEXT_SOURCE: git
-            #NAO_CONTEXT_GIT_URL: https://github.com/your-org/your-nao-context.git
-            NAO_CONTEXT_GIT_BRANCH: dev
+			# Option B: Git mode - uncomment and configure these instead:
+			NAO_CONTEXT_SOURCE: git
+			#NAO_CONTEXT_GIT_URL: https://github.com/your-org/your-nao-context.git
+			NAO_CONTEXT_GIT_BRANCH: dev
+			# NAO_CONTEXT_GIT_PLATFORM: github   # override for self-hosted hosts
             # NAO_CONTEXT_GIT_TOKEN: ${GITHUB_TOKEN}
             NAO_DEFAULT_PROJECT_PATH: /app/context
             # Optional: clone only a subfolder (sparse checkout) — useful for monorepos

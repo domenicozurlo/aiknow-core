@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Folder, GitFork, Globe, TimerIcon, Upload } from 'lucide-react';
+import { Folder, GitFork, Globe, ScanText, TimerIcon, Upload } from 'lucide-react';
 import type { ForkMetadata } from '@nao/backend/chat';
 import type { SelectionData } from '@/components/highlight-bubble';
 import { NEW_CHAT_ID } from '@/lib/ai';
 import { StoryOpenButton } from '@/components/story-open-button';
 import { StoryViewer } from '@/components/side-panel/story-viewer';
+import { DEFAULT_USAGE_SEARCH } from '@/components/settings/usage-route-search';
 import { ChatInput } from '@/components/chat-input';
 import { ChatMessages } from '@/components/chat-messages/chat-messages';
 import { HighlightBubble } from '@/components/highlight-bubble';
@@ -20,13 +21,17 @@ import { useSidePanel } from '@/hooks/use-side-panel';
 import { SidePanelProvider } from '@/contexts/side-panel';
 import { EditableChatTitle } from '@/components/editable-chat-title';
 import { useChatQuery } from '@/queries/use-chat-query';
+import { useHeight } from '@/hooks/use-height';
+import { AssetAnalyticsDialog } from '@/components/asset-analytics-dialog';
 import { ShareChatDialog } from '@/components/share-dialog.chat';
 import { usePermissions } from '@/hooks/use-permissions';
 import { trpc } from '@/main';
 import { SelectionProvider } from '@/contexts/text-selection';
 import { chatPendingCitationStore } from '@/stores/chat-pending-citation';
 import { useSetChatInputCallback } from '@/contexts/set-chat-input-callback';
+import { useTrackViewDuration } from '@/hooks/use-track-view-duration';
 import { getTextOffset } from '@/lib/selection-dom.utils';
+import { isForbiddenError } from '@/lib/trpc-error';
 
 export const Route = createFileRoute('/_sidebar-layout/_chat-layout/$chatId')({
 	component: RouteComponent,
@@ -54,8 +59,25 @@ function ChatPage() {
 	const { isLoadingMessages, isRunning } = useAgentContext();
 	const router = useRouter();
 	const { chatId } = Route.useParams();
+	const { role, canViewChatReplay } = usePermissions();
 	const chat = useChatQuery({ chatId });
 	const title = chat.data?.title;
+
+	const isForbidden = chat.isError && isForbiddenError(chat.error);
+	const shouldRedirectToReplay = isForbidden && canViewChatReplay;
+	const isResolvingReplayRedirect = isForbidden && role === undefined;
+
+	useEffect(() => {
+		if (shouldRedirectToReplay) {
+			router.navigate({
+				to: '/settings/usage/replay/$chatId',
+				params: { chatId },
+				search: DEFAULT_USAGE_SEARCH,
+				replace: true,
+			});
+		}
+	}, [shouldRedirectToReplay, chatId, router]);
+
 	const shareQuery = useQuery({
 		...trpc.sharedChat.getShareOptionsByChatId.queryOptions({ chatId }),
 		enabled: chat.isSuccess,
@@ -67,10 +89,15 @@ function ChatPage() {
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const sidePanelRef = useRef<HTMLDivElement>(null);
+	const inputAreaRef = useRef<HTMLDivElement>(null);
+	const inputAreaHeight = useHeight(inputAreaRef);
 
 	const sidePanel = useSidePanel({ containerRef, sidePanelRef });
 	const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+	const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 	const chatInputCallback = useSetChatInputCallback();
+
+	useTrackViewDuration({ assetType: 'chat', chatId });
 
 	const handleSelectionAsk = useCallback(
 		(data: SelectionData) => {
@@ -106,6 +133,9 @@ function ChatPage() {
 	}, [chat.isError, isLoadingMessages]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	if (chat.isError) {
+		if (shouldRedirectToReplay || isResolvingReplayRedirect) {
+			return null;
+		}
 		return <ChatNotFoundState />;
 	}
 
@@ -113,13 +143,19 @@ function ChatPage() {
 		<SidePanelProvider
 			isVisible={sidePanel.isVisible}
 			currentStorySlug={sidePanel.currentStorySlug}
+			setCurrentStorySlug={sidePanel.setCurrentStorySlug}
+			currentStoryTabIndex={sidePanel.currentStoryTabIndex}
+			setCurrentStoryTabIndex={sidePanel.setCurrentStoryTabIndex}
 			chatId={chatId}
 			open={sidePanel.open}
 			close={sidePanel.close}
 		>
-			<SelectionProvider key={chatId}>
+			<SelectionProvider resetKey={chatId}>
 				<div className='flex-1 flex min-w-0 bg-background' ref={containerRef}>
-					<div className='flex flex-col h-full flex-1 min-w-0 overflow-hidden justify-center relative'>
+					<div
+						className='flex flex-col h-full flex-1 min-w-0 overflow-hidden justify-center relative'
+						style={{ '--chat-input-height': `${inputAreaHeight}px` } as React.CSSProperties}
+					>
 						<MobileHeader chatId={chatId} title={title} automationId={automationId} />
 
 						<div className='group/header absolute flex items-center justify-between top-3 inset-x-4 z-10 max-md:hidden'>
@@ -155,8 +191,11 @@ function ChatPage() {
 									<Badge variant='outline' className='gap-1 text-muted-foreground w-fit'>
 										<GitFork />
 										<span className='truncate'>
-											{chat.data.forkMetadata.type === 'story' ? 'Story' : 'Chat'} thread
-											from{' '}
+											{chat.data.forkMetadata.type === 'story' ||
+											chat.data.forkMetadata.type === 'story_selection'
+												? 'Story'
+												: 'Chat'}{' '}
+											thread from{' '}
 										</span>
 										<span className='text-xs text-foreground'>
 											{chat.data.forkMetadata.authorName}
@@ -171,6 +210,16 @@ function ChatPage() {
 								)}
 							</div>
 							<div className='flex items-center justify-end gap-2'>
+								<Button
+									variant='ghost'
+									size='icon-sm'
+									className='hover:rounded-full'
+									onClick={() => setIsAnalyticsOpen(true)}
+									disabled={isRunning}
+									aria-label='Analytics'
+								>
+									<ScanText className='size-3' />
+								</Button>
 								<Button
 									variant='outline'
 									size='icon-sm'
@@ -210,8 +259,14 @@ function ChatPage() {
 								<ChatMessages />
 							</>
 						)}
-
-						<ChatInput />
+						<div className='pointer-events-none absolute left-0 right-4 bottom-0 z-10 pt-8'>
+							<div
+								ref={inputAreaRef}
+								className='pointer-events-auto bg-gradient-to-t from-background via-background via-70% to-transparent'
+							>
+								<ChatInput />
+							</div>
+						</div>
 					</div>
 
 					{sidePanel.content && (
@@ -227,6 +282,12 @@ function ChatPage() {
 				</div>
 			</SelectionProvider>
 			<ShareChatDialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen} chatId={chatId} />
+			<AssetAnalyticsDialog
+				open={isAnalyticsOpen}
+				onOpenChange={setIsAnalyticsOpen}
+				assetType='chat'
+				chatId={chatId}
+			/>
 		</SidePanelProvider>
 	);
 }

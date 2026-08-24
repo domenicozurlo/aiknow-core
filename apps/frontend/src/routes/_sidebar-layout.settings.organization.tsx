@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback } from 'react';
 import { Github, Plus } from 'lucide-react';
-import { USER_ROLES } from '@nao/shared/types';
+import { ORG_MEMBER_ROLES, USER_ROLE_LABELS } from '@nao/shared/types';
 import type { UserRole } from '@nao/shared/types';
 
 import type { TeamMember } from '@/components/settings/team';
@@ -14,6 +14,8 @@ import {
 	NewCredentialsDialog,
 } from '@/components/settings/team';
 import { GitHubRepoPicker } from '@/components/settings/github-repo-picker';
+import { GitLabRepoPicker } from '@/components/settings/gitlab-repo-picker';
+import GitlabIcon from '@/components/icons/gitlab-icon.svg';
 import { OrgApiKeys } from '@/components/settings/org-api-keys';
 import { OrgSignInDomains } from '@/components/settings/org-signin-domains';
 import { Badge } from '@/components/ui/badge';
@@ -46,8 +48,15 @@ function OrganizationPage() {
 		enabled: githubAvailable.data === true,
 	});
 
+	const gitlabAvailable = useQuery(trpc.gitlab.isAvailable.queryOptions());
+	const gitlabStatus = useQuery({
+		...trpc.gitlab.getStatus.queryOptions(),
+		enabled: gitlabAvailable.data === true,
+	});
+
 	const [isAddOpen, setIsAddOpen] = useState(false);
 	const [repoPickerOpen, setRepoPickerOpen] = useState(false);
+	const [gitlabPickerOpen, setGitlabPickerOpen] = useState(false);
 	const [editMember, setEditMember] = useState<TeamMember | null>(null);
 	const [removeMember, setRemoveMember] = useState<TeamMember | null>(null);
 	const [resetPasswordMember, setResetPasswordMember] = useState<TeamMember | null>(null);
@@ -90,7 +99,10 @@ function OrganizationPage() {
 	};
 
 	const handleEdit = async (data: { userId: string; name?: string; newRole?: UserRole }) => {
-		await modifyMember.mutateAsync(data);
+		await modifyMember.mutateAsync({
+			...data,
+			newRole: data.newRole as (typeof ORG_MEMBER_ROLES)[number] | undefined,
+		});
 		invalidateMembers();
 		if (session?.user) {
 			await queryClient.invalidateQueries({ queryKey: ['session'] });
@@ -116,22 +128,42 @@ function OrganizationPage() {
 
 	const isGithubConnected = githubStatus.data?.connected === true;
 	const showGithubImport = githubAvailable.data === true;
+	const isGitlabConnected = gitlabStatus.data?.connected === true;
+	const showGitlabImport = gitlabAvailable.data === true;
 
-	const projectsAction = showGithubImport ? (
-		isGithubConnected ? (
-			<Button variant='secondary' size='sm' onClick={() => setRepoPickerOpen(true)}>
-				<Github className='size-3.5' />
-				Import from GitHub
-			</Button>
-		) : (
-			<Button variant='secondary' size='sm' asChild>
-				<a href='/api/github/connect'>
-					<Github className='size-3.5' />
-					Import from GitHub
-				</a>
-			</Button>
-		)
-	) : undefined;
+	const projectsAction =
+		showGithubImport || showGitlabImport ? (
+			<div className='flex flex-wrap gap-2'>
+				{showGithubImport &&
+					(isGithubConnected ? (
+						<Button variant='secondary' size='sm' onClick={() => setRepoPickerOpen(true)}>
+							<Github className='size-3.5' />
+							Import from GitHub
+						</Button>
+					) : (
+						<Button variant='secondary' size='sm' asChild>
+							<a href='/api/github/connect'>
+								<Github className='size-3.5' />
+								Import from GitHub
+							</a>
+						</Button>
+					))}
+				{showGitlabImport &&
+					(isGitlabConnected ? (
+						<Button variant='secondary' size='sm' onClick={() => setGitlabPickerOpen(true)}>
+							<GitlabIcon className='size-3.5' />
+							Import from GitLab
+						</Button>
+					) : (
+						<Button variant='secondary' size='sm' asChild>
+							<a href='/api/gitlab/connect'>
+								<GitlabIcon className='size-3.5' />
+								Import from GitLab
+							</a>
+						</Button>
+					))}
+			</div>
+		) : undefined;
 
 	return (
 		<SettingsPageWrapper>
@@ -180,7 +212,7 @@ function OrganizationPage() {
 									<TableRow key={project.id}>
 										<TableCell className='font-medium'>{project.name}</TableCell>
 										<TableCell>
-											<Badge variant={project.role}>{project.role}</Badge>
+											<Badge variant={project.role}>{USER_ROLE_LABELS[project.role]}</Badge>
 										</TableCell>
 									</TableRow>
 								))}
@@ -211,7 +243,7 @@ function OrganizationPage() {
 				onOpenChange={(open) => !open && setEditMember(null)}
 				member={editMember}
 				isAdmin={isOrgAdmin}
-				availableRoles={USER_ROLES}
+				availableRoles={ORG_MEMBER_ROLES}
 				onSubmit={handleEdit}
 			/>
 
@@ -247,6 +279,7 @@ function OrganizationPage() {
 			/>
 
 			<GitHubRepoPicker open={repoPickerOpen} onOpenChange={setRepoPickerOpen} />
+			<GitLabRepoPicker open={gitlabPickerOpen} onOpenChange={setGitlabPickerOpen} />
 		</SettingsPageWrapper>
 	);
 }

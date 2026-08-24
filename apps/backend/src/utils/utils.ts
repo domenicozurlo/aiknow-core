@@ -25,11 +25,12 @@ export const getErrorMessage = (error: unknown): string | null => {
 	return String(error);
 };
 
-export const buildGithubAllowlist = (allowedUsers?: string): Set<string> => {
+/** GitHub and GitLab usernames are case-insensitive, so entries are normalized to lowercase. */
+export const buildUsernameAllowlist = (allowedUsers?: string): Set<string> => {
 	const allowed = new Set<string>();
 	if (allowedUsers) {
-		for (const login of allowedUsers.split(',')) {
-			const trimmed = login.trim();
+		for (const username of allowedUsers.split(',')) {
+			const trimmed = username.trim().toLowerCase();
 			if (trimmed) {
 				allowed.add(trimmed);
 			}
@@ -94,15 +95,15 @@ export const isPublicEmailDomain = (domain: string): boolean => {
 };
 
 export const isEmailDomainAllowed = (userEmail: string, authDomains?: string) => {
-	if (authDomains) {
-		const allowedDomains = authDomains.split(',').map((domain) => domain.trim().toLowerCase());
-		const userEmailDomain = userEmail.split('@').at(1)?.toLowerCase();
-		if (!userEmailDomain) {
-			return false;
-		}
-		return allowedDomains.includes(userEmailDomain);
+	const allowedDomains = authDomains
+		?.split(',')
+		.map((domain) => domain.trim().toLowerCase())
+		.filter(Boolean);
+	if (!allowedDomains?.length) {
+		return false;
 	}
-	return false;
+	const userEmailDomain = userEmail.split('@').at(1)?.toLowerCase();
+	return Boolean(userEmailDomain && allowedDomains.includes(userEmailDomain));
 };
 
 /**
@@ -158,6 +159,9 @@ export function groupBy<T, K extends string>(
 		{} as Record<K, T[]>,
 	);
 }
+
+export const previewApiKey = (apiKey: string | null | undefined): string | null =>
+	apiKey ? apiKey.slice(0, 8) + '...' + apiKey.slice(-4) : null;
 
 export const buildCredentialPreviews = (
 	credentials: Record<string, string> | null | undefined,

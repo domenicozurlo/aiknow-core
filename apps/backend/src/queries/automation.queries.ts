@@ -15,7 +15,7 @@ import s, {
 } from '../db/abstractSchema';
 import { db } from '../db/db';
 import type { AutomationIntegrationResult } from '../types/automation';
-import { type ListActivityRow, listRecentActivities } from './activity.queries';
+import { type ListActivityRow, listRecentActivities, type StoryOpenLink } from './activity.queries';
 
 export const automationJobUniqueKey = (automationId: string): string => `automation:${automationId}`;
 const AUTOMATION_RUN_STALE_MS = 30 * 60 * 1_000;
@@ -100,7 +100,7 @@ export const createAutomation = async (data: NewAutomation): Promise<DBAutomatio
 	return created;
 };
 
-export const linkAutomationJob = async (id: string, scheduledJobId: string): Promise<void> => {
+export const linkAutomationJob = async (id: string, scheduledJobId: string | null): Promise<void> => {
 	await db.update(s.automation).set({ scheduledJobId }).where(eq(s.automation.id, id)).execute();
 };
 
@@ -120,6 +120,7 @@ export const updateAutomation = async (
 			| 'mcpEnabled'
 			| 'mcpServers'
 			| 'integrations'
+			| 'webhookEnabled'
 		>
 	>,
 ): Promise<DBAutomation | null> => {
@@ -321,7 +322,7 @@ function mapAutomationWithSchedule(
 
 export type AutomationFeedChart = {
 	toolCallId: string;
-	config: displayChart.Input;
+	config: displayChart.ChartInput;
 	data: unknown[];
 };
 
@@ -374,6 +375,7 @@ export type ActivityFeedStoryRefreshItem = {
 		cacheSchedule: string | null;
 		cacheScheduleDescription: string | null;
 	};
+	link: StoryOpenLink | null;
 };
 
 export type ActivityFeedStorySharedItem = {
@@ -393,6 +395,7 @@ export type ActivityFeedStorySharedItem = {
 		id: string;
 		visibility: StoryVisibility;
 	};
+	link: StoryOpenLink | null;
 	actorName: string | null;
 };
 
@@ -496,6 +499,7 @@ function buildActivityFeedItem(row: ListActivityRow): ActivityFeedItem | null {
 				queriesRefreshed: readNumber(row.activity.payload, 'queriesRefreshed') ?? 0,
 			},
 			story: row.story,
+			link: row.storyLink,
 		};
 	}
 	if (row.activity.type === 'story.shared') {
@@ -514,6 +518,7 @@ function buildActivityFeedItem(row: ListActivityRow): ActivityFeedItem | null {
 				chatId: row.story.chatId,
 			},
 			share: row.storyShare,
+			link: row.storyLink,
 			actorName: row.actorName,
 		};
 	}
@@ -687,7 +692,7 @@ function parseChartPart(
 	if (part.type !== 'tool-display_chart' || part.toolState !== 'output-available' || !part.toolCallId) {
 		return null;
 	}
-	const config = displayChart.InputSchema.safeParse(part.toolInput);
+	const config = displayChart.ChartInputSchema.safeParse(part.toolInput);
 	if (!config.success) {
 		return null;
 	}

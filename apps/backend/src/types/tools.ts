@@ -1,4 +1,4 @@
-import type { displayChart } from '@nao/shared/tools';
+import type { displayChart, displayMap } from '@nao/shared/tools';
 
 import { AgentSettings } from './agent-settings';
 
@@ -8,7 +8,8 @@ export interface QueryResult {
 }
 
 export interface GeneratedArtifacts {
-	charts: displayChart.Input[];
+	charts: (displayChart.BuiltinChartInput | displayChart.KpiCardInput)[];
+	maps: displayMap.Input[];
 	stories: { id: string; title: string }[];
 }
 
@@ -17,6 +18,7 @@ export interface ToolContext {
 	chatId: string;
 	userId: string;
 	projectId: string;
+	supportsCustomCharts: boolean;
 	agentSettings: AgentSettings | null;
 	envVars: Record<string, string>;
 	/**
@@ -33,6 +35,11 @@ export interface ToolContext {
 	 */
 	queryResults: Map<string, QueryResult>;
 	generatedArtifacts: GeneratedArtifacts;
+	/**
+	 * Admin mode: when true, `execute_sql` runs read-only SQL over nao's own
+	 * project-scoped app-database views instead of the user's warehouse.
+	 */
+	adminMode?: boolean;
 }
 
 export type McpToolContext = Omit<ToolContext, 'chatId'> & { chatId: null };

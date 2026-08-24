@@ -4,10 +4,11 @@ import * as projectQueries from '../queries/project.queries';
 import * as storyQueries from '../queries/story.queries';
 import { assertProjectMcpEnabled, verifyEmbedToken } from './embed-token';
 import { HandlerError } from './error';
-import { resolveStoryQueryDataForSandbox, type StoryQueryDataMap } from './story-query-data';
+import { backfillMissingQueryDataForSandbox, type StoryQueryDataMap } from './story-query-data';
 
 export type EmbedStoryContent = {
 	storyId: string;
+	projectId: string;
 	title: string;
 	code: string;
 	slug: string;
@@ -45,7 +46,7 @@ export async function loadEmbedStoryContent(storyId: string, token: string): Pro
 	}
 
 	const [queryData, displaySettings] = await Promise.all([
-		resolveStoryQueryDataForSandbox(version.code, {
+		backfillMissingQueryDataForSandbox(version.code, {
 			storyId,
 			chatId: version.chatId,
 			projectId,
@@ -55,6 +56,7 @@ export async function loadEmbedStoryContent(storyId: string, token: string): Pro
 
 	return {
 		storyId: version.storyId,
+		projectId,
 		title: version.title,
 		code: version.code,
 		slug: version.slug,

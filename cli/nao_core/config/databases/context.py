@@ -166,8 +166,15 @@ class DatabaseContext:
             except Exception:
                 continue
 
+        clustering_columns = []
+        try:
+            clustering_columns = self.clustering_columns()
+        except Exception:
+            pass
+
         return {
             "computed_at": datetime.now(timezone.utc).isoformat(),
+            "clustering_columns": clustering_columns,
             "columns": profiles,
         }
 
@@ -452,8 +459,6 @@ class DatabaseContext:
         lowered = normalized.lower()
         if lowered.startswith("string(") and normalized.endswith(")"):
             return "string"
-        if normalized == "int64":
-            return "int32"
         return normalized
 
     @staticmethod

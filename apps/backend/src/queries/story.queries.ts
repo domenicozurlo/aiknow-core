@@ -1,8 +1,10 @@
+import { extractQueryIds } from '@nao/shared/story-segments';
 import { type StorySharingInfo } from '@nao/shared/types';
 import { and, asc, desc, eq, inArray, isNull, max, or, type SQL, sql } from 'drizzle-orm';
 
 import s, { type DBStory, type DBStoryDataCache, type DBStoryVersion } from '../db/abstractSchema';
 import { db, type DBExecutor } from '../db/db';
+import * as executeSqlQueries from './execute-sql.queries';
 
 export type UserStoryRow = Pick<
 	DBStory,
@@ -19,7 +21,7 @@ export type UserStoryRow = Pick<
 	| 'archivedAt'
 	| 'createdAt'
 	| 'updatedAt'
-> & { code: string };
+> & { code: string; version: number };
 
 export async function getStoryByChatAndSlug(
 	chatId: string,
@@ -92,6 +94,7 @@ export async function getStoryByIdForUser(storyId: string, userId: string): Prom
 			createdAt: s.story.createdAt,
 			updatedAt: s.story.updatedAt,
 			code: s.storyVersion.code,
+			version: s.storyVersion.version,
 		})
 		.from(s.story)
 		.leftJoin(s.chat, eq(s.story.chatId, s.chat.id))
@@ -333,19 +336,6 @@ export async function archiveStory(chatId: string, slug: string): Promise<void> 
 	await detachStoriesFromFolders(ids.map((row) => row.id));
 }
 
-export async function archiveManyStories(stories: { chatId: string; slug: string }[]): Promise<void> {
-	if (stories.length === 0) {
-		return;
-	}
-
-	const conditions = stories.map(({ chatId, slug }) => and(eq(s.story.chatId, chatId), eq(s.story.slug, slug)));
-	const matcher = or(...conditions);
-
-	await db.update(s.story).set({ archivedAt: new Date() }).where(matcher).execute();
-	const ids = await db.select({ id: s.story.id }).from(s.story).where(matcher).execute();
-	await detachStoriesFromFolders(ids.map((row) => row.id));
-}
-
 export async function unarchiveStory(chatId: string, slug: string): Promise<void> {
 	await db
 		.update(s.story)
@@ -569,26 +559,26 @@ export async function getSqlQueriesFromCode(
 	chatId: string,
 	code: string,
 ): Promise<Record<string, { sqlQuery: string; databaseId?: string }>> {
-	const chartRegex = /<(?:chart|table)\s+[^>]*query_id="([^"]*)"[^>]*\/?>/g;
-	const queryIds = new Set<string>();
-	let match;
-	while ((match = chartRegex.exec(code)) !== null) {
-		queryIds.add(match[1]);
-	}
-
+	const queryIds = extractQueryIds(code);
 	if (queryIds.size === 0) {
 		return {};
 	}
 
-	return getSqlQueriesByIds(chatId, queryIds);
+	return executeSqlQueries.getLatestSqlQueriesByIds(chatId, queryIds);
 }
 
 export async function getSqlQueryById(
 	chatId: string,
 	queryId: string,
 ): Promise<{ sqlQuery: string; databaseId?: string } | null> {
-	const result = await getSqlQueriesByIds(chatId, new Set([queryId]));
-	return result[queryId] ?? null;
+	const part = await executeSqlQueries.getExecuteSqlPartByQueryIdInChat(chatId, queryId);
+	if (!part) {
+		return null;
+	}
+	return {
+		sqlQuery: part.toolInput.sql_query,
+		...(part.toolInput.database_id && { databaseId: part.toolInput.database_id }),
+	};
 }
 
 async function queryStoriesWithLatestVersion(
@@ -613,6 +603,7 @@ async function queryStoriesWithLatestVersion(
 			createdAt: s.story.createdAt,
 			updatedAt: s.story.updatedAt,
 			code: s.storyVersion.code,
+			version: s.storyVersion.version,
 		})
 		.from(s.story)
 		.leftJoin(s.chat, eq(s.story.chatId, s.chat.id))
@@ -674,32 +665,6 @@ async function getOrCreateStandaloneStory(data: {
 		throw new Error(`Failed to create or retrieve standalone story: ${data.userId}/${data.projectId}/${data.slug}`);
 	}
 	return row;
-}
-
-async function getSqlQueriesByIds(
-	chatId: string,
-	queryIds: Set<string>,
-): Promise<Record<string, { sqlQuery: string; databaseId?: string }>> {
-	const parts = await db
-		.select({ toolInput: s.messagePart.toolInput, toolOutput: s.messagePart.toolOutput })
-		.from(s.messagePart)
-		.innerJoin(s.chatMessage, eq(s.messagePart.messageId, s.chatMessage.id))
-		.where(and(eq(s.chatMessage.chatId, chatId), eq(s.messagePart.toolName, 'execute_sql')))
-		.execute();
-
-	const queries: Record<string, { sqlQuery: string; databaseId?: string }> = {};
-	for (const part of parts) {
-		const output = part.toolOutput as { id?: string } | null;
-		const input = part.toolInput as { sql_query?: string; database_id?: string } | null;
-		if (output?.id && queryIds.has(output.id) && input?.sql_query) {
-			queries[output.id] = {
-				sqlQuery: input.sql_query,
-				...(input.database_id && { databaseId: input.database_id }),
-			};
-		}
-	}
-
-	return queries;
 }
 
 async function getStoryVersion(

@@ -1,14 +1,16 @@
-import { splitCodeIntoSegments } from '@nao/shared/story-segments';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useCallback, useMemo, useState } from 'react';
-import type { ParsedChartBlock, ParsedTableBlock } from '@nao/shared/story-segments';
+import { useCallback, useState } from 'react';
+import type { ParsedChartBlock, ParsedMapBlock, ParsedTableBlock } from '@nao/shared/story-segments';
 
 import type { SelectionData } from '@/components/highlight-bubble';
 import type { QueryDataMap } from '@/components/story-embeds';
+import type { StoryRefreshFailure } from '@/components/story-page-header';
+import { AssetAnalyticsDialog } from '@/components/asset-analytics-dialog';
 import { HighlightBubble } from '@/components/highlight-bubble';
-import { StoryChartEmbed, StoryTableEmbed } from '@/components/story-embeds';
-import { SegmentList } from '@/components/story-rendering';
+import { StoryAccessError } from '@/components/story-access-error';
+import { StoryChartEmbed, StoryMapEmbed, StoryTableEmbed } from '@/components/story-embeds';
+import { StoryTabbedContent } from '@/components/story-tabbed-content';
 import { StoryPageHeader } from '@/components/story-page-header';
 import { LiveStorySettingsDialog } from '@/components/side-panel/live-story-settings-dialog';
 import { useStoryViewerLiveSettings } from '@/components/side-panel/hooks/use-story-viewer-live-settings';
@@ -18,6 +20,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { SelectionProvider } from '@/contexts/text-selection';
 import { chatPendingCitationStore } from '@/stores/chat-pending-citation';
 import { useStoryPageEditor } from '@/hooks/use-story-page-editor';
+import { useTrackViewDuration } from '@/hooks/use-track-view-duration';
 import { trpc } from '@/main';
 
 export const Route = createFileRoute('/_sidebar-layout/stories/standalone/$storyId')({
@@ -27,10 +30,13 @@ export const Route = createFileRoute('/_sidebar-layout/stories/standalone/$story
 function StandaloneStoryPage() {
 	const { storyId } = Route.useParams();
 	const navigate = useNavigate();
+	const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 	const queryClient = useQueryClient();
 
 	const storyQuery = useQuery(trpc.story.getStandalone.queryOptions({ storyId }));
 	const story = storyQuery.data;
+
+	useTrackViewDuration({ assetType: 'story', storyId, versionNumber: story?.version });
 
 	const openStandaloneMutation = useMutation(
 		trpc.chatFork.openStandalone.mutationOptions({
@@ -72,8 +78,8 @@ function StandaloneStoryPage() {
 		);
 	}
 
-	if (!story) {
-		return <div>Not Found</div>;
+	if (storyQuery.isError || !story) {
+		return <StoryAccessError error={storyQuery.error} onRetry={() => storyQuery.refetch()} />;
 	}
 
 	if (story.chatId) {
@@ -85,6 +91,8 @@ function StandaloneStoryPage() {
 				chatId={story.chatId}
 				storySlug={story.slug}
 				queryData={story.queryData as QueryDataMap | null}
+				cachedAt={story.cachedAt}
+				lastRefreshFailure={story.lastRefreshFailure}
 				onOpenChat={handleOpenChat}
 				isOpeningChat={openStandaloneMutation.isPending}
 			/>
@@ -99,12 +107,33 @@ function StandaloneStoryPage() {
 				isOpeningChat={openStandaloneMutation.isPending}
 				download={{ storyId, isOwner: true }}
 				storyId={storyId}
-				live={story.isLive ? { isLive: true } : undefined}
+				live={
+					story.isLive
+						? {
+								isLive: true,
+								cachedAt: story.cachedAt,
+								lastRefreshFailure: story.lastRefreshFailure,
+							}
+						: undefined
+				}
+				onOpenAnalytics={() => setIsAnalyticsOpen(true)}
 			/>
 			<SelectionProvider key={storyId}>
 				<HighlightBubble onAsk={handleSelectionAsk} disabled />
-				<StandaloneStoryContent code={story.code} queryData={story.queryData as QueryDataMap | null} />
+				<StandaloneStoryContent
+					code={story.code}
+					queryData={story.queryData as QueryDataMap | null}
+					chatId={story.chatId}
+					storySlug={story.slug}
+				/>
 			</SelectionProvider>
+
+			<AssetAnalyticsDialog
+				open={isAnalyticsOpen}
+				onOpenChange={setIsAnalyticsOpen}
+				assetType='story'
+				storyId={storyId}
+			/>
 		</div>
 	);
 }
@@ -116,6 +145,8 @@ interface StandaloneEditableStoryProps {
 	chatId: string;
 	storySlug: string;
 	queryData: QueryDataMap | null;
+	cachedAt?: string | Date | null;
+	lastRefreshFailure?: StoryRefreshFailure | null;
 	onOpenChat: () => void;
 	isOpeningChat: boolean;
 }
@@ -127,12 +158,15 @@ function StandaloneEditableStory({
 	chatId,
 	storySlug,
 	queryData,
+	cachedAt,
+	lastRefreshFailure,
 	onOpenChat,
 	isOpeningChat,
 }: StandaloneEditableStoryProps) {
 	const navigate = useNavigate();
 	const [isLiveSettingsOpen, setIsLiveSettingsOpen] = useState(false);
 	const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+	const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
 	const {
 		isLive,
@@ -166,6 +200,8 @@ function StandaloneEditableStory({
 				isOpeningChat={isOpeningChat}
 				live={{
 					isLive,
+					cachedAt,
+					lastRefreshFailure,
 					isRefreshing,
 					onRefresh: () => handleRefreshData(),
 					onOpenSettings: () => setIsLiveSettingsOpen(true),
@@ -174,6 +210,7 @@ function StandaloneEditableStory({
 				storyId={storyId}
 				isShared={isShared}
 				onShare={() => setIsShareDialogOpen(true)}
+				onOpenAnalytics={() => setIsAnalyticsOpen(true)}
 				viewModeControls={{
 					viewMode: editor.viewMode,
 					onViewModeChange: editor.setViewMode,
@@ -199,7 +236,13 @@ function StandaloneEditableStory({
 				preview={
 					<SelectionProvider key={storySlug}>
 						<HighlightBubble onAsk={handleSelectionAsk} disabled={false} />
-						<StandaloneStoryContent code={editor.code} queryData={queryData} />
+						<StandaloneStoryContent
+							code={editor.code}
+							queryData={queryData}
+							chatId={chatId}
+							storySlug={storySlug}
+							filtersEnabled={editor.versionNav.isViewingLatest && !editor.isCodeDirty}
+						/>
 					</SelectionProvider>
 				}
 			/>
@@ -221,28 +264,102 @@ function StandaloneEditableStory({
 				chatId={chatId}
 				storySlug={storySlug}
 			/>
+
+			<AssetAnalyticsDialog
+				open={isAnalyticsOpen}
+				onOpenChange={setIsAnalyticsOpen}
+				assetType='story'
+				storyId={storyId}
+			/>
 		</div>
 	);
 }
 
-function StandaloneStoryContent({ code, queryData }: { code: string; queryData: QueryDataMap | null }) {
-	const segments = useMemo(() => splitCodeIntoSegments(code), [code]);
+function StandaloneStoryContent({
+	code,
+	queryData,
+	chatId,
+	storySlug,
+	filtersEnabled = true,
+}: {
+	code: string;
+	queryData: QueryDataMap | null;
+	chatId?: string | null;
+	storySlug?: string;
+	filtersEnabled?: boolean;
+}) {
+	const filterApi = filtersEnabled && chatId && storySlug ? { kind: 'owned' as const, chatId, storySlug } : null;
 
 	const renderChart = useCallback(
-		(chart: ParsedChartBlock) => <StoryChartEmbed chart={chart} queryData={queryData} />,
-		[queryData],
+		(
+			chart: ParsedChartBlock,
+			{
+				queryData: data,
+				hasActiveFilters,
+				isRefreshing,
+			}: {
+				queryData: QueryDataMap | null;
+				hasActiveFilters: boolean;
+				isRefreshing: boolean;
+			},
+		) => (
+			<StoryChartEmbed
+				chart={chart}
+				queryData={data}
+				hasActiveFilters={hasActiveFilters}
+				isRefreshing={isRefreshing}
+			/>
+		),
+		[],
 	);
 
 	const renderTable = useCallback(
-		(table: ParsedTableBlock) => <StoryTableEmbed table={table} queryData={queryData} />,
-		[queryData],
+		(
+			table: ParsedTableBlock,
+			{
+				queryData: data,
+				hasActiveFilters,
+				isRefreshing,
+			}: { queryData: QueryDataMap | null; hasActiveFilters: boolean; isRefreshing: boolean },
+		) => (
+			<StoryTableEmbed
+				table={table}
+				queryData={data}
+				hasActiveFilters={hasActiveFilters}
+				isRefreshing={isRefreshing}
+			/>
+		),
+		[],
+	);
+
+	const renderMap = useCallback(
+		(
+			map: ParsedMapBlock,
+			{
+				queryData: data,
+				hasActiveFilters,
+				isRefreshing,
+			}: { queryData: QueryDataMap | null; hasActiveFilters: boolean; isRefreshing: boolean },
+		) => (
+			<StoryMapEmbed
+				map={map}
+				queryData={data}
+				hasActiveFilters={hasActiveFilters}
+				isRefreshing={isRefreshing}
+				allowExpand
+			/>
+		),
+		[],
 	);
 
 	return (
-		<div className='flex-1 overflow-auto'>
-			<div className='max-w-5xl mx-auto p-4 md:p-8 flex flex-col gap-4'>
-				<SegmentList segments={segments} renderChart={renderChart} renderTable={renderTable} />
-			</div>
-		</div>
+		<StoryTabbedContent
+			code={code}
+			baselineQueryData={queryData}
+			filterApi={filterApi}
+			renderChart={renderChart}
+			renderTable={renderTable}
+			renderMap={renderMap}
+		/>
 	);
 }
