@@ -19,6 +19,7 @@ import { githubRoutes } from './github.routes';
 import { gitlabRoutes } from './gitlab.routes';
 import { licenseRoutes } from './license.routes';
 import { logRoutes } from './log.routes';
+import { mapRoutes } from './map.routes';
 import { mcpRoutes } from './mcp.routes';
 import { mcpEndpointRoutes } from './mcp-endpoint.routes';
 import { memoryRoutes } from './memory.routes';
@@ -29,6 +30,7 @@ import { sharedChatRoutes } from './shared-chat.routes';
 import { sharedStoryRoutes } from './shared-story.routes';
 import { skillRoutes } from './skill.routes';
 import { sqlRoutes } from './sql.routes';
+import { storageRoutes } from './storage.routes';
 import { storyRoutes } from './story.routes';
 import { storyFolderRoutes } from './story-folder.routes';
 import { systemRoutes } from './system.routes';
@@ -45,6 +47,7 @@ export const trpcRouter = router({
 	chart: chartRoutes,
 	chartPlugin: chartPluginRoutes,
 	chat: chatRoutes,
+	map: mapRoutes,
 	sql: sqlRoutes,
 	sharedChat: sharedChatRoutes,
 	automation: automationRoutes,
@@ -60,6 +63,7 @@ export const trpcRouter = router({
 	log: logRoutes,
 	posthog: posthogRoutes,
 	project: projectRoutes,
+	storage: storageRoutes,
 	storyShare: sharedStoryRoutes,
 	story: storyRoutes,
 	storyFolder: storyFolderRoutes,

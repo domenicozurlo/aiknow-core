@@ -21,6 +21,7 @@ import { useSidePanel } from '@/hooks/use-side-panel';
 import { SidePanelProvider } from '@/contexts/side-panel';
 import { EditableChatTitle } from '@/components/editable-chat-title';
 import { useChatQuery } from '@/queries/use-chat-query';
+import { useHeight } from '@/hooks/use-height';
 import { AssetAnalyticsDialog } from '@/components/asset-analytics-dialog';
 import { ShareChatDialog } from '@/components/share-dialog.chat';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -88,6 +89,8 @@ function ChatPage() {
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const sidePanelRef = useRef<HTMLDivElement>(null);
+	const inputAreaRef = useRef<HTMLDivElement>(null);
+	const inputAreaHeight = useHeight(inputAreaRef);
 
 	const sidePanel = useSidePanel({ containerRef, sidePanelRef });
 	const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -147,9 +150,12 @@ function ChatPage() {
 			open={sidePanel.open}
 			close={sidePanel.close}
 		>
-			<SelectionProvider key={chatId}>
+			<SelectionProvider resetKey={chatId}>
 				<div className='flex-1 flex min-w-0 bg-background' ref={containerRef}>
-					<div className='flex flex-col h-full flex-1 min-w-0 overflow-hidden justify-center relative'>
+					<div
+						className='flex flex-col h-full flex-1 min-w-0 overflow-hidden justify-center relative'
+						style={{ '--chat-input-height': `${inputAreaHeight}px` } as React.CSSProperties}
+					>
 						<MobileHeader chatId={chatId} title={title} automationId={automationId} />
 
 						<div className='group/header absolute flex items-center justify-between top-3 inset-x-4 z-10 max-md:hidden'>
@@ -253,8 +259,14 @@ function ChatPage() {
 								<ChatMessages />
 							</>
 						)}
-
-						<ChatInput />
+						<div className='pointer-events-none absolute left-0 right-4 bottom-0 z-10 pt-8'>
+							<div
+								ref={inputAreaRef}
+								className='pointer-events-auto bg-gradient-to-t from-background via-background via-70% to-transparent'
+							>
+								<ChatInput />
+							</div>
+						</div>
 					</div>
 
 					{sidePanel.content && (

@@ -84,7 +84,7 @@ nao init
 
 This will create a new nao project in the current directory. It will prompt you for a project name and ask you to configure:
 
-- **Database connections** (BigQuery, DuckDB, Databricks, Snowflake, PostgreSQL, Redshift, MSSQL, Trino, StarRocks)
+- **Database connections** (BigQuery, DuckDB, MotherDuck, Databricks, Snowflake, PostgreSQL, Redshift, MSSQL, Trino, StarRocks)
 - **Git repositories** to sync
 - **LLM provider** (OpenAI, Anthropic, Mistral, Gemini, OpenRouter, Ollama)
 - **`ai_summary` template + model** (prompted only when you enable `ai_summary` for databases)
@@ -135,6 +135,17 @@ databases:
     path: ":memory:"
 YAML
 nao init --yes
+
+# MotherDuck (DuckDB-compatible cloud) — token via env recommended
+cat > nao_config.yaml <<'YAML'
+project_name: my-project
+databases:
+  - type: motherduck
+    name: md-analytics
+    database: my_db
+    token: "{{ env('MOTHERDUCK_TOKEN') }}"
+YAML
+nao init --yes
 ```
 
 In non-interactive mode, `nao init` never asks for input. Configure databases, LLM provider, and integrations by editing `nao_config.yaml` directly (or by pre-writing it before `nao init`).
@@ -146,6 +157,11 @@ nao chat
 ```
 
 This will start the nao chat UI. It will open the chat interface in your browser at `http://localhost:5005`.
+
+To let the agent run code in a micro-VM, download the sandbox runtime once with `nao chat --sandbox`, then enable
+Sandboxes in Settings → Experimental. The runtime and the DuckDB engine used by `nao test` are ~100 MB each, so they
+are not shipped in the package: nao fetches them on first use and caches them in `~/.nao/native`. Set
+`NAO_NATIVE_REGISTRY` to download them from an npm mirror instead of `registry.npmjs.org`.
 
 ### Test connectivity
 

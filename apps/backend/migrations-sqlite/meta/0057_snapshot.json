@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b5214498-2852-476f-b087-1be9e13078a5",
+  "id": "851ce55f-bbb7-428f-a26c-d84d68b4effe",
   "prevId": "0a579216-7320-416d-b330-2a4857de72e6",
   "tables": {
     "account": {
@@ -1457,97 +1457,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "context_asset": {
-      "name": "context_asset",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "virtual_path": {
-          "name": "virtual_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "data": {
-          "name": "data",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "media_type": {
-          "name": "media_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(cast(unixepoch('subsecond') * 1000 as integer))"
-        }
-      },
-      "indexes": {
-        "context_asset_projectId_idx": {
-          "name": "context_asset_projectId_idx",
-          "columns": [
-            "project_id"
-          ],
-          "isUnique": false
-        },
-        "context_asset_project_path_hash_unique": {
-          "name": "context_asset_project_path_hash_unique",
-          "columns": [
-            "project_id",
-            "virtual_path",
-            "content_hash"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "context_asset_project_id_project_id_fk": {
-          "name": "context_asset_project_id_project_id_fk",
-          "tableFrom": "context_asset",
-          "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "context_recommendation": {
       "name": "context_recommendation",
       "columns": {
@@ -2738,6 +2647,74 @@
         "mcp_chart_embed_query_id_mcp_query_data_query_id_fk": {
           "name": "mcp_chart_embed_query_id_mcp_query_data_query_id_fk",
           "tableFrom": "mcp_chart_embed",
+          "tableTo": "mcp_query_data",
+          "columnsFrom": [
+            "query_id"
+          ],
+          "columnsTo": [
+            "query_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "mcp_map_embed": {
+      "name": "mcp_map_embed",
+      "columns": {
+        "map_embed_id": {
+          "name": "map_embed_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "query_id": {
+          "name": "query_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "map_config": {
+          "name": "map_config",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_chat_id": {
+          "name": "source_chat_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast(unixepoch('subsecond') * 1000 as integer))"
+        }
+      },
+      "indexes": {
+        "mcp_map_embed_query_id_idx": {
+          "name": "mcp_map_embed_query_id_idx",
+          "columns": [
+            "query_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "mcp_map_embed_query_id_mcp_query_data_query_id_fk": {
+          "name": "mcp_map_embed_query_id_mcp_query_data_query_id_fk",
+          "tableFrom": "mcp_map_embed",
           "tableTo": "mcp_query_data",
           "columnsFrom": [
             "query_id"
@@ -4523,6 +4500,13 @@
         },
         "display_settings": {
           "name": "display_settings",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "map_settings": {
+          "name": "map_settings",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

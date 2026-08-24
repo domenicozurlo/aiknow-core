@@ -14,15 +14,18 @@ count.txt
 chats
 nao-chat-server
 .pytest_cache/
+uploads/
 
 *.pyc
 
 rsa_key.*
 apps/backend/projects/
+apps/backend/storage/
 
 *.code-workspace
 
 .cursor/
+.nao/
 nao_irriai_context_deploy_key
 nao_irriai_context_deploy_key.pub
 

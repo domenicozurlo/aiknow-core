@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import type { LucideIcon } from 'lucide-react';
 import type { UIMessage, UIToolPart } from '@nao/backend/chat';
 import { trpc } from '@/main';
-import { useAgentContext } from '@/contexts/agent.provider';
+import { useAgentContext, useAgentMessages } from '@/contexts/agent.provider';
 import { cn } from '@/lib/utils';
 
 const CHART_TYPE_OPTIONS: { value: displayChart.ChartType; label: string }[] = [
@@ -512,32 +512,33 @@ export function ChartConfigEditDialog({
 								}
 
 								return (
-									<div
-										key={index}
-										className='flex flex-col gap-2 rounded-md border border-border px-3 pt-2 pb-3'
-									>
-										<SeriesTypeSelect
-											value={series.series_type ?? 'bar'}
-											onChange={(value) => updateSeriesAt(index, { series_type: value })}
-										/>
-										{row}
-										{isOpen && (
-											<SeriesValueFormatFields
-												d3Format={series.value_format?.d3_format ?? ''}
-												unit={unit}
-												placement={placement}
-												onD3FormatChange={(value) =>
-													updateSeriesValueFormatAt(index, 'd3_format', value)
-												}
-												onUnitChange={(nextUnit, nextPlacement) =>
-													setSeriesUnit(index, {
-														unit: nextUnit,
-														placement: nextPlacement,
-													})
-												}
+									<fieldset key={index} className='rounded-md border border-border px-3 pt-1 pb-3'>
+										<legend className='ml-1'>
+											<SeriesTypeSelect
+												value={series.series_type ?? 'bar'}
+												onChange={(value) => updateSeriesAt(index, { series_type: value })}
 											/>
-										)}
-									</div>
+										</legend>
+										<div className='flex flex-col gap-2'>
+											{row}
+											{isOpen && (
+												<SeriesValueFormatFields
+													d3Format={series.value_format?.d3_format ?? ''}
+													unit={unit}
+													placement={placement}
+													onD3FormatChange={(value) =>
+														updateSeriesValueFormatAt(index, 'd3_format', value)
+													}
+													onUnitChange={(nextUnit, nextPlacement) =>
+														setSeriesUnit(index, {
+															unit: nextUnit,
+															placement: nextPlacement,
+														})
+													}
+												/>
+											)}
+										</div>
+									</fieldset>
 								);
 							})}
 						</div>
@@ -707,7 +708,8 @@ export function DisplayChartEditDialog({
 	data,
 }: DisplayChartEditDialogProps) {
 	const queryClient = useQueryClient();
-	const { messages, setMessages } = useAgentContext();
+	const { setMessages } = useAgentContext();
+	const messages = useAgentMessages();
 
 	const updateMutation = useMutation(
 		trpc.chart.updateConfig.mutationOptions({

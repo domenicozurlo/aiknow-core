@@ -1,48 +1,55 @@
 export { isPythonAvailable } from './execute-python';
 export { isSandboxAvailable } from './execute-sandboxed-code';
 
+import type { CustomBoundarySet } from '@nao/shared';
 import type { Tool } from 'ai';
 
 import { mcpService } from '../../services/mcp';
+import { isStorageEnabled } from '../../services/storage';
 import { AgentSettings } from '../../types/agent-settings';
 import clarification from './clarification';
 import displayChart from './display-chart';
-import displayMap from './display-map';
+import { createDisplayMapTool } from './display-map';
 import executePython from './execute-python';
 import executeSandboxedCode from './execute-sandboxed-code';
 import executeSql from './execute-sql';
 import grep from './grep';
 import list from './list';
+import loadSkill from './load-skill';
 import { createMcpCallTool } from './mcp-call';
 import { createMcpConnectTool } from './mcp-connect';
 import read from './read';
 import readQueryResult from './read-query-result';
 import search from './search';
-import story from './story';
+import story, { buildStoryToolDescription } from './story';
 import suggestFollowUps from './suggest-follow-ups';
+import write from './write';
 
 /**
- * Tools whose output only the web chat can render — excluded from automations and the MCP sub-agent.
- * Messaging providers keep them and degrade to an "open in nao" link (a card on Slack/Teams/Telegram,
- * a plain-text link on WhatsApp).
+ * Tools excluded from the MCP sub-agent (`ask_nao`): it returns a text summary to the calling client,
+ * so a map — which has no textual representation — cannot be surfaced. Every other surface renders it:
+ * the web chat interactively, and messaging/automations as a static PNG.
  */
-export const WEB_CHAT_ONLY_TOOLS = ['display_map'];
+export const MCP_SUB_AGENT_EXCLUDED_TOOLS = ['display_map'];
 
 export const tools = {
 	story,
 	clarification,
 	display_chart: displayChart,
-	display_map: displayMap,
 	...(executePython && { execute_python: executePython }),
 	...(executeSandboxedCode && { execute_sandboxed_code: executeSandboxedCode }),
 	execute_sql: executeSql,
 	read_query_result: readQueryResult,
 	grep,
 	list,
+	load_skill: loadSkill,
 	read,
 	search,
+	write,
 	suggest_follow_ups: suggestFollowUps,
 };
+
+export const uiToolset = { ...tools, display_map: createDisplayMapTool() };
 
 export const getTools = (
 	agentSettings: AgentSettings | null,
@@ -65,6 +72,8 @@ export const getTools = (
 		 * web chat: automations, MCP sub-agent, WhatsApp).
 		 */
 		excludeBuiltinTools?: string[];
+		/** Custom GeoJSON boundary sets defined by the project admin. */
+		customBoundaries?: CustomBoundarySet[];
 	} = {},
 ) => {
 	const configuredServers = new Set(mcpService.getConfiguredServerNames());
@@ -85,10 +94,14 @@ export const getTools = (
 		execute_sandboxed_code,
 		clarification: clarificationTool,
 		suggest_follow_ups,
-		display_map: displayMapTool,
+		write: writeTool,
 		...rest
 	} = tools;
-	const baseTools = options.excludeFollowUps ? rest : { ...rest, suggest_follow_ups };
+	const baseTools = {
+		...rest,
+		...(isStorageEnabled() && { write: writeTool }),
+		...(!options.excludeFollowUps && { suggest_follow_ups }),
+	};
 
 	const allTools = {
 		...baseTools,
@@ -96,7 +109,9 @@ export const getTools = (
 		...mcpTools,
 		...(agentSettings?.experimental?.pythonSandboxing && execute_python && { execute_python }),
 		...(agentSettings?.experimental?.sandboxes && execute_sandboxed_code && { execute_sandboxed_code }),
-		...(agentSettings?.experimental?.displayMap && { display_map: displayMapTool }),
+		...(agentSettings?.mapEnabled !== false && {
+			display_map: createDisplayMapTool(options.customBoundaries ?? []),
+		}),
 		...extraTools,
 	};
 
@@ -108,6 +123,14 @@ export const getTools = (
 	if (options.excludeBuiltinTools) {
 		const excluded = new Set(options.excludeBuiltinTools);
 		result = keepTools(result, extraTools, (name) => !excluded.has(name));
+	}
+
+	if ('story' in result) {
+		const mapsEnabled = 'display_map' in result;
+		result = {
+			...result,
+			story: { ...result.story, description: buildStoryToolDescription({ mapsEnabled }) },
+		};
 	}
 
 	return result;

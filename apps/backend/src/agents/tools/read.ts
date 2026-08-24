@@ -1,3 +1,4 @@
+import { isBinaryDocument } from '@nao/shared/attachments';
 import { readFile } from '@nao/shared/tools';
 import { createHash } from 'crypto';
 import fs from 'fs/promises';
@@ -5,8 +6,16 @@ import path from 'path';
 
 import { ReadOutput, renderToModelOutput } from '../../components/tool-outputs';
 import { resolveMarkdownImageAssets, resolveTextImageAssets } from '../../services/context-assets.service';
-import { toRealPath, toVirtualPath } from '../../utils/tools';
-import { createTool } from '../../utils/tools';
+import { toReadableText } from '../../services/file-text';
+import { readUserFile } from '../../services/storage/user-files';
+import {
+	createTool,
+	isStoragePath,
+	toRealPath,
+	toStorageRelativePath,
+	toStorageScope,
+	toVirtualPath,
+} from '../../utils/tools';
 
 const MARKDOWN_EXTENSIONS = new Set(['md', 'mdx', 'markdown']);
 const JSON_EXTENSIONS = new Set(['json']);
@@ -26,50 +35,44 @@ export default createTool<readFile.Input, readFile.Output>({
 	inputSchema: readFile.InputSchema,
 	outputSchema: readFile.OutputSchema,
 	execute: async ({ file_path }, context) => {
-		const projectFolder = context.projectFolder;
-		const realPath = toRealPath(file_path, projectFolder);
-
-		if (isImagePath(file_path)) {
-			const content = await renderImageAsMarkdown({
-				realPath,
-				filePath: file_path,
-				projectFolder,
-				projectId: context.projectId,
-			});
-			return {
-				_version: '1' as const,
-				content,
-				numberOfTotalLines: 1,
-			};
-		}
-
-		let content = await fs.readFile(realPath, 'utf-8');
-		if (isMarkdownPath(file_path)) {
-			content = await resolveMarkdownImageAssets({
-				content,
-				projectId: context.projectId,
-				projectFolder,
-				sourceFilePath: file_path,
-			});
-		} else if (isJsonPath(file_path)) {
-			content = await resolveTextImageAssets({
-				content,
-				projectId: context.projectId,
-				projectFolder,
-				sourceFilePath: file_path,
-			});
-		}
-		const numberOfTotalLines = content.split('\n').length;
+		const content = isStoragePath(file_path)
+			? await readUserFile(toStorageScope(context), toStorageRelativePath(file_path))
+			: await readProjectFileWithAssets(file_path, context.projectFolder, context.projectId);
 
 		return {
 			_version: '1' as const,
 			content,
-			numberOfTotalLines,
+			numberOfTotalLines: content.split('\n').length,
 		};
 	},
 
 	toModelOutput: ({ output }) => renderToModelOutput(ReadOutput({ output }), output),
 });
+
+async function readProjectFileWithAssets(filePath: string, projectFolder: string, projectId: string): Promise<string> {
+	const realPath = toRealPath(filePath, projectFolder);
+	if (isImagePath(filePath)) {
+		return renderImageAsMarkdown({ realPath, filePath, projectFolder, projectId });
+	}
+
+	let content = await readProjectFile(realPath);
+	if (isMarkdownPath(filePath)) {
+		content = await resolveMarkdownImageAssets({
+			content,
+			projectId,
+			projectFolder,
+			sourceFilePath: filePath,
+		});
+	} else if (isJsonPath(filePath)) {
+		content = await resolveTextImageAssets({
+			content,
+			projectId,
+			projectFolder,
+			sourceFilePath: filePath,
+		});
+	}
+	return content;
+}
 
 function isMarkdownPath(filePath: string): boolean {
 	const extension = filePath.split('.').pop()?.toLowerCase();
@@ -130,3 +133,12 @@ async function renderImageAsMarkdown({
 	const altText = path.basename(filePath).replaceAll(/[_-]+/g, ' ');
 	return `![${altText}](/context-assets/${id})`;
 }
+
+/** Only non-text formats need their bytes inspected, so plain files keep the cheaper path. */
+const readProjectFile = async (realPath: string): Promise<string> => {
+	if (!isBinaryDocument(realPath)) {
+		return fs.readFile(realPath, 'utf-8');
+	}
+
+	return toReadableText(realPath, await fs.readFile(realPath));
+};

@@ -12,7 +12,7 @@ RUN npm install -g bun
 FROM base AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json bun.lock ./
+COPY package.json package-lock.json bun.lock bunfig.toml ./
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/backend/package.json ./apps/backend/
 COPY apps/shared/package.json ./apps/shared/
@@ -117,7 +117,14 @@ COPY --from=python-builder --chown=nao:nao /usr/local/bin/nao /usr/local/bin/nao
 COPY --from=deps --chown=nao:nao /app/package.json ./
 COPY --from=deps --chown=nao:nao /app/node_modules ./node_modules
 
-# Copy backend and shared source (no build needed - Bun runs TS directly)
+# Queries against the local DuckDB run with external access off, so extensions have to be on disk
+# before the first query rather than fetched on demand.
+# Mount under /app so Node's ESM resolver finds /app/node_modules (a /tmp mount would not).
+RUN --mount=type=bind,source=docker/install-duckdb-extensions.mjs,target=/app/install-duckdb-extensions.mjs \
+    DUCKDB_EXTENSION_DIR=/app/.duckdb-extensions node /app/install-duckdb-extensions.mjs \
+    && chown -R nao:nao /app/.duckdb-extensions
+
+# Copy backend and shared source (no build needed — Bun runs TS directly)
 COPY --chown=nao:nao apps/backend ./apps/backend
 COPY --chown=nao:nao apps/shared ./apps/shared
 
@@ -151,6 +158,7 @@ ENV APP_BUILD_DATE=$APP_BUILD_DATE
 ENV NAO_DEFAULT_PROJECT_PATH=/app/context
 ENV NAO_CONTEXT_SOURCE=local
 ENV DOCKER=1
+ENV DUCKDB_EXTENSION_DIR=/app/.duckdb-extensions
 
 EXPOSE 5005
 

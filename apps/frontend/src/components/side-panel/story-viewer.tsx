@@ -29,6 +29,7 @@ import { useDragAutoScroll } from '@/hooks/use-drag-auto-scroll';
 import { useTrackViewDuration } from '@/hooks/use-track-view-duration';
 import { ReadonlyAgentMessagesProvider, useOptionalAgentContext } from '@/contexts/agent.provider';
 import { StoryChartEditProvider } from '@/contexts/story-chart-edit';
+import { StoryMapEditProvider } from '@/contexts/story-map-edit';
 import { StoryTableEditProvider } from '@/contexts/story-table-edit';
 import { StoryEmbedDataProvider } from '@/contexts/story-embed-data';
 import { Spinner } from '@/components/ui/spinner';
@@ -99,6 +100,7 @@ export function StoryViewer({ chatId, storySlug, isReadonlyMode: readonlyProp, i
 		storyCode,
 		queryData,
 		cachedAt,
+		lastRefreshFailure,
 		isLoading: isContentLoading,
 	} = useStoryViewerContent({
 		storySlug,
@@ -243,6 +245,7 @@ export function StoryViewer({ chatId, storySlug, isReadonlyMode: readonlyProp, i
 				isCodeDirty={isCodeDirty}
 				isCodeValid={isCodeValid}
 				cachedAt={cachedAt}
+				lastRefreshFailure={lastRefreshFailure}
 			/>
 
 			{Boolean(archivedAt) && <ArchivedBanner chatId={chatId} storySlug={resolvedStorySlug} />}
@@ -278,7 +281,7 @@ export function StoryViewer({ chatId, storySlug, isReadonlyMode: readonlyProp, i
 								queryData={queryData ?? null}
 								chatId={chatId}
 								storySlug={resolvedStorySlug}
-								versionKey={`${currentVersionNumber}-${cachedAt ?? ''}`}
+								versionKey={isViewingLatest ? undefined : currentVersionNumber}
 								filtersEnabled={isViewingLatest && !isAgentRunning}
 							/>
 						)
@@ -366,7 +369,14 @@ function renderWithEditProvider(
 				storyTitle={params.storyTitle}
 				storyCode={params.storyCode}
 			>
-				{children}
+				<StoryMapEditProvider
+					chatId={params.chatId}
+					storySlug={params.storySlug}
+					storyTitle={params.storyTitle}
+					storyCode={params.storyCode}
+				>
+					{children}
+				</StoryMapEditProvider>
 			</StoryTableEditProvider>
 		</StoryChartEditProvider>
 	);

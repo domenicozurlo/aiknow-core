@@ -3,15 +3,18 @@ import { Fragment, memo, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Streamdown } from 'streamdown';
 
-import { CITATION_TAG_REGEX } from '@nao/shared';
+import { stripAssistantTags } from '@nao/shared';
 import type { ReactNode } from 'react';
 
 import { CitationPopover } from '@/components/citation-popover';
 import { ImageLightbox } from '@/components/image-lightbox';
 import { MarkdownTable } from '@/components/chat-messages/markdown-table';
+import { StreamingMarkdown } from '@/components/chat-messages/streaming-markdown';
+import { FileChip } from '@/components/file-chip';
 import { ContextPdfViewer } from '@/components/side-panel/context-pdf-viewer';
 import { Button } from '@/components/ui/button';
 import { useSidePanel } from '@/contexts/side-panel';
+import { isStoredFilePath } from '@/lib/attachments';
 import { markdownPlugins } from '@/lib/markdown';
 
 const CLOBBER_PREFIX = 'user-content-';
@@ -32,6 +35,11 @@ const OMITTED_IMAGE_VALUE_REGEX =
 function stripClobberPrefix(value: string): string {
 	return value.startsWith(CLOBBER_PREFIX) ? value.slice(CLOBBER_PREFIX.length) : value;
 }
+const ALLOWED_TAGS = {
+	'citation-number': ['id', 'column'],
+	'saved-file': ['path'],
+};
+const LITERAL_TAG_CONTENT = ['citation-number', 'saved-file'];
 
 export const AssistantTextWithCitation = memo(({ text, isStreaming }: { text: string; isStreaming: boolean }) => {
 	const sidePanel = useSidePanel();
@@ -75,17 +83,15 @@ export const AssistantTextWithCitation = memo(({ text, isStreaming }: { text: st
 					</span>
 				);
 			},
+			'saved-file': SavedFileRenderer,
 		}),
 		[sidePanel.chatId, openPdf],
 	);
 
 	if (isStreaming) {
-		const strippedText = displayText.replace(CITATION_TAG_REGEX, '');
 		return (
 			<>
-				<Streamdown isAnimating mode='streaming' plugins={markdownPlugins} components={streamdownComponents}>
-					{strippedText}
-				</Streamdown>
+				<StreamingMarkdown components={streamdownComponents} text={displayText} transform={stripAssistantTags} />
 				<ContextAssetImages imageUrls={imageUrls} />
 			</>
 		);
@@ -95,10 +101,8 @@ export const AssistantTextWithCitation = memo(({ text, isStreaming }: { text: st
 		<>
 			<Streamdown
 				plugins={markdownPlugins}
-				allowedTags={{
-					'citation-number': ['id', 'column'],
-				}}
-				literalTagContent={['citation-number']}
+				allowedTags={ALLOWED_TAGS}
+				literalTagContent={LITERAL_TAG_CONTENT}
 				components={streamdownComponents}
 			>
 				{contentSections.body}
@@ -110,6 +114,19 @@ export const AssistantTextWithCitation = memo(({ text, isStreaming }: { text: st
 		</>
 	);
 });
+
+/** A file the answer hands over. One nao cannot reach stays as the text the model wrote. */
+function SavedFileRenderer({ path, children }: any) {
+	const label = asText(children);
+	const filePath = asText(path);
+	if (!isStoredFilePath(filePath)) {
+		return <>{label || filePath}</>;
+	}
+
+	return <FileChip path={filePath} label={label || undefined} className='mx-0.5' />;
+}
+
+const asText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 function ContextPdfInlineReference({
 	value,
