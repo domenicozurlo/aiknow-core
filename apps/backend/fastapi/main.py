@@ -19,8 +19,9 @@ load_dotenv()
 cli_path = Path(__file__).resolve().parent.parent.parent.parent / "cli"
 sys.path.insert(0, str(cli_path))
 
-from nao_core.config import NaoConfig, NaoConfigError
-from nao_core.context import get_context_provider
+from irrifarm_scope import IrrifarmScopeError, apply_irrifarm_scope  # noqa: E402
+from nao_core.config import NaoConfig, NaoConfigError  # noqa: E402
+from nao_core.context import get_context_provider  # noqa: E402
 
 port = int(os.environ.get("PORT", 8005))
 
@@ -97,6 +98,7 @@ class ExecuteSQLRequest(BaseModel):
     database_id: str | None = None
     env_vars: dict[str, str] | None = None
     azure_access_token: str | None = None
+    allowed_mbo_sns: list[str] | None = None
 
 
 class ExecuteSQLResponse(BaseModel):
@@ -262,6 +264,15 @@ async def execute_sql(request: ExecuteSQLRequest):
                 },
             )
 
+        scoped_sql = request.sql
+        if request.allowed_mbo_sns is not None:
+            try:
+                scoped_sql = apply_irrifarm_scope(
+                    request.sql, request.allowed_mbo_sns, db_config.type
+                )
+            except IrrifarmScopeError as error:
+                raise HTTPException(status_code=403, detail=str(error)) from error
+
         auth_mode_value = getattr(getattr(db_config, "auth_mode", None), "value", None)
 
         if auth_mode_value == "azure_entra_id":
@@ -275,10 +286,10 @@ async def execute_sql(request: ExecuteSQLRequest):
                     ),
                 )
             df = db_config.execute_sql_with_token(
-                request.sql, request.azure_access_token
+                scoped_sql, request.azure_access_token
             )
         else:
-            df = db_config.execute_sql(request.sql)
+            df = db_config.execute_sql(scoped_sql)
 
         data = [
             {k: _convert_value(v) for k, v in row.items()}

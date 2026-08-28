@@ -10,6 +10,7 @@ import type { DBStoryDataCache } from '../db/abstractSchema';
 import { env } from '../env';
 import { renderToMarkdown } from '../lib/markdown';
 import * as chatQueries from '../queries/chat.queries';
+import * as irrifarmIdentityQueries from '../queries/irrifarm-identity.queries';
 import * as projectQueries from '../queries/project.queries';
 import * as llmConfigQueries from '../queries/project-llm-config.queries';
 import { getQueryDataFromCode } from '../queries/shared-story.queries';
@@ -36,18 +37,21 @@ export async function executeLiveQuery(
 		throw new Error(`Query ${queryId} not found in chat ${chatId}`);
 	}
 
-	const projectId = await chatQueries.getChatProjectId(chatId);
-	if (!projectId) {
+	const chat = await chatQueries.getChatInfo(chatId);
+	if (!chat) {
 		throw new Error('Chat project not found');
 	}
 
-	const project = await projectQueries.retrieveProjectById(projectId);
+	const project = await projectQueries.retrieveProjectById(chat.projectId);
 	if (!project.path) {
 		throw new Error('Project path not configured');
 	}
 
-	const envVars = await projectQueries.getEnvVars(projectId);
-	return executeRawSql(stripSqlFilterBlocks(query.sqlQuery), project.path, query.databaseId, envVars);
+	const [envVars, allowedMboSns] = await Promise.all([
+		projectQueries.getEnvVars(chat.projectId),
+		irrifarmIdentityQueries.getAllowedMboSns(chat.userId),
+	]);
+	return executeRawSql(stripSqlFilterBlocks(query.sqlQuery), project.path, query.databaseId, envVars, allowedMboSns);
 }
 
 export interface RefreshResult {
@@ -76,15 +80,19 @@ export async function refreshStoryData(chatId: string, slug: string): Promise<Re
 	}
 
 	const queryData: Record<string, { data: unknown[]; columns: string[] }> = {};
+	const [projectEnvVars, allowedMboSns] = await Promise.all([
+		projectQueries.getEnvVars(chat.projectId),
+		irrifarmIdentityQueries.getAllowedMboSns(chat.userId),
+	]);
 
 	await Promise.all(
 		Object.entries(sqlQueries).map(async ([queryId, { sqlQuery, databaseId }]) => {
-			const projectEnvVars = await projectQueries.getEnvVars(chat.projectId);
 			const result = await executeRawSql(
 				stripSqlFilterBlocks(sqlQuery),
 				project.path!,
 				databaseId,
 				projectEnvVars,
+				allowedMboSns,
 			);
 			queryData[queryId] = result;
 		}),
@@ -155,6 +163,7 @@ export async function executeRawSql(
 	projectFolder: string,
 	databaseId?: string,
 	envVars?: Record<string, string>,
+	allowedMboSns: string[] | null = null,
 ): Promise<{ data: unknown[]; columns: string[] }> {
 	const response = await fetch(`http://localhost:${env.FASTAPI_PORT}/execute_sql`, {
 		method: 'POST',
@@ -164,6 +173,7 @@ export async function executeRawSql(
 			nao_project_folder: projectFolder,
 			...(databaseId && { database_id: databaseId }),
 			...(envVars && Object.keys(envVars).length > 0 && { env_vars: envVars }),
+			...(allowedMboSns !== null && { allowed_mbo_sns: allowedMboSns }),
 		}),
 	});
 

@@ -135,6 +135,28 @@ export const account = pgTable(
 	(table) => [index('account_userId_idx').on(table.userId)],
 );
 
+export const irrifarmIdentity = pgTable(
+	'irrifarm_identity',
+	{
+		userId: text('user_id')
+			.primaryKey()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		irrifarmUserId: integer('irrifarm_user_id').notNull().unique(),
+		username: text('username').notNull(),
+		clientId: integer('client_id').notNull(),
+		clientLevel: integer('client_level').notNull(),
+		userRole: text('user_role'),
+		regId: text('reg_id'),
+		mboSns: jsonb('mbo_sns').$type<string[]>().notNull().default([]),
+		lastValidatedAt: timestamp('last_validated_at').notNull(),
+		updatedAt: timestamp('updated_at')
+			.defaultNow()
+			.$onUpdate(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	},
+	(table) => [index('irrifarm_identity_username_idx').on(table.username)],
+);
+
 export const verification = pgTable(
 	'verification',
 	{

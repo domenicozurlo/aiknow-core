@@ -91,6 +91,19 @@ const envSchema = z.object({
 	OIDC_GROUP_ROLE_MAPPING: z.string().optional(),
 	SSO_SESSION_MAX_AGE: z.coerce.number().int().positive().optional(),
 
+	IRRIFARM_BASE_URL: z
+		.string()
+		.optional()
+		.transform((val) => val?.trim() || undefined)
+		.pipe(z.url({ message: 'IRRIFARM_BASE_URL must be a valid URL' }).optional()),
+	IRRIFARM_AUTH_MODE: z.enum(['disabled', 'fixture', 'check-user']).default('disabled'),
+	IRRIFARM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+	IRRIFARM_APP_ORIGINS: z.string().optional(),
+	IRRIFARM_FIXTURE_USERNAME: z.string().optional(),
+	IRRIFARM_FIXTURE_USER_ID: z.coerce.number().int().positive().optional(),
+	IRRIFARM_FIXTURE_CLIENT_ID: z.coerce.number().int().positive().optional(),
+	IRRIFARM_FIXTURE_CLIENT_LEVEL: z.coerce.number().int().positive().optional(),
+
 	SMTP_PASSWORD: z.string().optional(),
 	SMTP_HOST: z.string().optional(),
 	SMTP_PORT: z.string().optional(),

@@ -22,6 +22,7 @@ import * as userQueries from './queries/user.queries';
 import { emailService } from './services/email';
 import { githubOAuthConfig } from './services/github';
 import * as gitlabService from './services/gitlab';
+import { augmentPluginsWithIrrifarm } from './services/irrifarm-auth.plugin';
 import { hasFeature, LICENSE_FEATURES } from './services/license.service';
 import {
 	augmentSocialProvidersWithMicrosoft,
@@ -109,6 +110,7 @@ async function createAuthInstance(baseURL: string) {
 	const disableEmailSignUp = await shouldDisableEmailSignUp();
 
 	const ssoPlugins: BetterAuthPlugin[] = [];
+	augmentPluginsWithIrrifarm(ssoPlugins);
 
 	// Cloud uses a single deployment-level Google credential; self-hosted reads the
 	// org-level credential (with env fallback) so existing instances keep working.
@@ -227,7 +229,13 @@ async function createAuthInstance(baseURL: string) {
 			}),
 			...ssoPlugins,
 		],
-		trustedOrigins: baseURL ? [baseURL, ...(env.MODE === 'dev' ? ['http://localhost:3000'] : [])] : undefined,
+		trustedOrigins: baseURL
+			? [
+					baseURL,
+					...(env.MODE === 'dev' ? ['http://localhost:3000'] : []),
+					...parseIrrifarmAppOrigins(env.IRRIFARM_APP_ORIGINS),
+				]
+			: undefined,
 		emailAndPassword: {
 			enabled: env.ENABLE_USER_LOGIN === true,
 			disableSignUp: disableEmailSignUp,
@@ -367,6 +375,17 @@ async function createAuthInstance(baseURL: string) {
 			},
 		},
 	});
+}
+
+function parseIrrifarmAppOrigins(raw: string | undefined): string[] {
+	if (!raw) {
+		return [];
+	}
+	return raw
+		.split(',')
+		.map((value) => value.trim())
+		.filter(Boolean)
+		.map((value) => new URL(value).origin);
 }
 
 async function shouldDisableEmailSignUp(): Promise<boolean> {

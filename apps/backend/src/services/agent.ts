@@ -31,6 +31,7 @@ import { DBChat } from '../db/abstractSchema';
 import { renderToMarkdown } from '../lib/markdown';
 import * as chatQueries from '../queries/chat.queries';
 import * as imageQueries from '../queries/image.queries';
+import * as irrifarmIdentityQueries from '../queries/irrifarm-identity.queries';
 import * as projectQueries from '../queries/project.queries';
 import * as storyQueries from '../queries/story.queries';
 import { AgentSettings } from '../types/agent-settings';
@@ -71,6 +72,7 @@ import { isStoragePath } from '../utils/tools';
 import { truncateMiddle } from '../utils/utils';
 import { listChartPlugins } from './chart-plugin';
 import { compactionService } from './compaction';
+import { appendIrrifarmAuthorizationContext } from './irrifarm-agent-context';
 import { hasFeature, LICENSE_FEATURES } from './license.service';
 import { mcpService } from './mcp';
 import { memoryService } from './memory';
@@ -183,9 +185,10 @@ async function _buildContextBase(opts: {
 	}
 	const agentSettings =
 		opts.agentSettings !== undefined ? opts.agentSettings : await projectQueries.getAgentSettings(opts.projectId);
-	const [envVars, azureAccessToken] = await Promise.all([
+	const [envVars, azureAccessToken, allowedMboSns] = await Promise.all([
 		projectQueries.getEnvVars(opts.projectId),
 		hasFeature(LICENSE_FEATURES.sso).then((has) => (has ? getAzureAccessTokenForUser(opts.userId) : null)),
+		irrifarmIdentityQueries.getAllowedMboSns(opts.userId),
 	]);
 	return {
 		projectFolder: project.path,
@@ -195,6 +198,7 @@ async function _buildContextBase(opts: {
 		agentSettings,
 		envVars,
 		azureAccessToken,
+		allowedMboSns,
 		queryResults: new Map(),
 		generatedArtifacts: { charts: [], maps: [], stories: [] },
 	};
@@ -568,7 +572,9 @@ class AgentManager {
 		const uiMessagesWithCompaction = compactionService.useLastCompaction(uiMessagesWithDbContext);
 		const uiMessagesWithResolvedAttachments = await resolveAttachments(uiMessagesWithCompaction);
 
-		const systemPrompt = this._systemPromptOverride ?? (await this._buildSystemPrompt(provider, timezone, chatUrl));
+		const baseSystemPrompt =
+			this._systemPromptOverride ?? (await this._buildSystemPrompt(provider, timezone, chatUrl));
+		const systemPrompt = appendIrrifarmAuthorizationContext(baseSystemPrompt, this._toolContext.allowedMboSns);
 
 		const systemMessage: Omit<UIMessage, 'id'> = {
 			role: 'system',
