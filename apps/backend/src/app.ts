@@ -45,7 +45,7 @@ import { embedStoryDownloadRoutes } from './routes/embed-story-download';
 import { githubRoutes } from './routes/github';
 import { gitlabRoutes } from './routes/gitlab';
 import { imageRoutes } from './routes/image';
-import { irrifarmDevRoutes } from './routes/irrifarm-dev';
+import { irrifarmTestPageRoutes, shouldRegisterIrrifarmTestPage } from './routes/irrifarm-dev';
 import { mapBoundariesRoutes } from './routes/map-boundaries';
 import { mcpOAuthRoutes } from './routes/mcp-oauth';
 import { slackRoutes } from './routes/slack';
@@ -208,8 +208,8 @@ app.register(authErrorRedirectRoutes, {
 	prefix: '/api',
 });
 
-if (isDev) {
-	app.register(irrifarmDevRoutes, {
+if (shouldRegisterIrrifarmTestPage(env.MODE, env.IRRIFARM_TEST_PAGE_ENABLED)) {
+	app.register(irrifarmTestPageRoutes, {
 		prefix: '/api/auth/irrifarm',
 	});
 }

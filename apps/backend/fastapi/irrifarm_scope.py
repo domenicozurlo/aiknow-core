@@ -86,6 +86,37 @@ def apply_irrifarm_scope(
     return statement.sql(dialect=sqlglot_dialect)
 
 
+def apply_irrifarm_query_guardrails(
+    sql: str,
+    dialect: str,
+    max_rows: int,
+    timeout_ms: int,
+) -> tuple[str, int]:
+    if max_rows <= 0:
+        raise IrrifarmScopeError("IRRIFARM_MAX_QUERY_ROWS must be positive")
+    if timeout_ms <= 0:
+        raise IrrifarmScopeError("IRRIFARM_QUERY_TIMEOUT_MS must be positive")
+
+    sqlglot_dialect = _sqlglot_dialect(dialect)
+    try:
+        statement = parse_one(sql, read=sqlglot_dialect)
+    except ParseError as error:
+        raise IrrifarmScopeError("The SQL query could not be guarded safely") from error
+
+    if not isinstance(statement, (exp.Select, exp.Union)):
+        raise IrrifarmScopeError("Only SELECT queries are allowed for Irrifarm users")
+
+    existing_limit = _literal_row_limit(statement)
+    applied_limit = min(existing_limit, max_rows) if existing_limit else max_rows
+    if existing_limit is None or existing_limit > max_rows:
+        statement.limit(max_rows, copy=False)
+
+    if sqlglot_dialect == "mysql":
+        _set_mysql_execution_timeout(statement, timeout_ms)
+
+    return statement.sql(dialect=sqlglot_dialect), applied_limit
+
+
 def _replace_with_scoped_subquery(
     table: exp.Table, column: str, serials: list[str]
 ) -> None:
@@ -123,6 +154,50 @@ def _validate_serials(values: list[str]) -> list[str]:
             raise IrrifarmScopeError("Invalid Irrifarm MBO serial")
         normalized.append(serial)
     return sorted(set(normalized))
+
+
+def _literal_row_limit(statement: exp.Select | exp.Union) -> int | None:
+    limit = statement.args.get("limit")
+    if not isinstance(limit, exp.Limit) or not isinstance(
+        limit.expression, exp.Literal
+    ):
+        return None
+    if limit.expression.is_string:
+        return None
+    try:
+        value = int(limit.expression.name)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _set_mysql_execution_timeout(
+    statement: exp.Select | exp.Union, timeout_ms: int
+) -> None:
+    target = statement if isinstance(statement, exp.Select) else statement.this
+    if not isinstance(target, exp.Select):
+        return
+
+    existing_hint = target.args.get("hint")
+    expressions = (
+        [
+            expression
+            for expression in existing_hint.expressions
+            if not (
+                isinstance(expression, exp.Anonymous)
+                and expression.name.upper() == "MAX_EXECUTION_TIME"
+            )
+        ]
+        if isinstance(existing_hint, exp.Hint)
+        else []
+    )
+    expressions.append(
+        exp.Anonymous(
+            this="MAX_EXECUTION_TIME",
+            expressions=[exp.Literal.number(timeout_ms)],
+        )
+    )
+    target.set("hint", exp.Hint(expressions=expressions))
 
 
 def _sqlglot_dialect(dialect: str) -> str:

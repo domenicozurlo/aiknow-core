@@ -1,6 +1,10 @@
 import pytest
 
-from irrifarm_scope import IrrifarmScopeError, apply_irrifarm_scope
+from irrifarm_scope import (
+    IrrifarmScopeError,
+    apply_irrifarm_query_guardrails,
+    apply_irrifarm_scope,
+)
 
 
 POLICY = {"motherboards": "MBO_SN", "senshistory": "MBO_SN"}
@@ -53,3 +57,40 @@ def test_allows_an_explicit_global_table():
 def test_rejects_non_select_statements():
     with pytest.raises(IrrifarmScopeError, match="Only SELECT"):
         apply_irrifarm_scope("DELETE FROM motherboards", ["SN001"], "mysql", POLICY)
+
+
+def test_query_guardrails_add_limit_and_mysql_timeout():
+    guarded, applied_limit = apply_irrifarm_query_guardrails(
+        "SELECT MBO_SN FROM motherboards ORDER BY MBO_SN",
+        "mysql",
+        max_rows=500,
+        timeout_ms=30_000,
+    )
+
+    assert "MAX_EXECUTION_TIME(30000)" in guarded
+    assert guarded.endswith("LIMIT 500")
+    assert applied_limit == 500
+
+
+def test_query_guardrails_clamp_large_limit_and_preserve_small_limit():
+    clamped, clamped_limit = apply_irrifarm_query_guardrails(
+        "SELECT * FROM motherboards LIMIT 1000", "mysql", 500, 30_000
+    )
+    preserved, preserved_limit = apply_irrifarm_query_guardrails(
+        "SELECT * FROM motherboards LIMIT 20", "mysql", 500, 30_000
+    )
+
+    assert clamped.endswith("LIMIT 500")
+    assert clamped_limit == 500
+    assert preserved.endswith("LIMIT 20")
+    assert preserved_limit == 20
+
+
+def test_query_guardrails_do_not_add_mysql_hint_to_other_dialects():
+    guarded, applied_limit = apply_irrifarm_query_guardrails(
+        "SELECT * FROM motherboards", "postgresql", 100, 30_000
+    )
+
+    assert "MAX_EXECUTION_TIME" not in guarded
+    assert guarded.endswith("LIMIT 100")
+    assert applied_limit == 100

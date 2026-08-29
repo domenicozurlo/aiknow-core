@@ -1,7 +1,11 @@
 import type { App } from '../app';
 import { env } from '../env';
 
-export const irrifarmDevRoutes = async (app: App) => {
+export function shouldRegisterIrrifarmTestPage(mode: string, explicitlyEnabled: boolean): boolean {
+	return mode !== 'prod' || explicitlyEnabled;
+}
+
+export const irrifarmTestPageRoutes = async (app: App) => {
 	app.get('/test', async (_request, reply) => {
 		reply
 			.header('Cache-Control', 'no-store')

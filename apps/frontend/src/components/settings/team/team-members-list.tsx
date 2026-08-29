@@ -5,6 +5,7 @@ import { USER_ROLE_LABELS } from '@nao/shared/types';
 import type { TeamMember } from './types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { getAccountDisplayLabel } from '@/lib/irrifarm-user';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
 	DropdownMenu,
@@ -42,7 +43,7 @@ export function TeamMembersList({
 			<TableHeader>
 				<TableRow>
 					<TableHead>Name</TableHead>
-					<TableHead>Email</TableHead>
+					<TableHead>Account</TableHead>
 					<TableHead>Role</TableHead>
 					{hasActions && <TableHead className='w-0' />}
 				</TableRow>
@@ -56,7 +57,9 @@ export function TeamMembersList({
 								{member.name}
 								{isCurrentUser && <span className='text-muted-foreground ml-1'>(you)</span>}
 							</TableCell>
-							<TableCell className='font-mono text-muted-foreground'>{member.email}</TableCell>
+							<TableCell className='font-mono text-muted-foreground'>
+								{getAccountDisplayLabel(member.email)}
+							</TableCell>
 							<TableCell>
 								<Badge variant={member.role}>{USER_ROLE_LABELS[member.role]}</Badge>
 							</TableCell>

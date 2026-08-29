@@ -1,14 +1,18 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { irrifarmDevRoutes, renderIrrifarmSsoTestPage } from '../src/routes/irrifarm-dev';
+import {
+	irrifarmTestPageRoutes,
+	renderIrrifarmSsoTestPage,
+	shouldRegisterIrrifarmTestPage,
+} from '../src/routes/irrifarm-dev';
 
 describe('Irrifarm development test page', () => {
 	let app: FastifyInstance;
 
 	beforeEach(async () => {
 		app = Fastify();
-		await app.register(irrifarmDevRoutes, { prefix: '/api/auth/irrifarm' });
+		await app.register(irrifarmTestPageRoutes, { prefix: '/api/auth/irrifarm' });
 		await app.ready();
 	});
 
@@ -35,5 +39,12 @@ describe('Irrifarm development test page', () => {
 		expect(page).not.toContain('user"><script>');
 		expect(page).toContain('fixture&lt;script&gt;');
 		expect(page).toContain('user&quot;&gt;&lt;script&gt;');
+	});
+
+	it('requires explicit enablement only in production', () => {
+		expect(shouldRegisterIrrifarmTestPage('dev', false)).toBe(true);
+		expect(shouldRegisterIrrifarmTestPage('test', false)).toBe(true);
+		expect(shouldRegisterIrrifarmTestPage('prod', false)).toBe(false);
+		expect(shouldRegisterIrrifarmTestPage('prod', true)).toBe(true);
 	});
 });

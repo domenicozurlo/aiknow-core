@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usePostHog } from '@/contexts/posthog.provider';
 import { useSession } from '@/lib/auth-client';
+import { getDeliverableEmail } from '@/lib/irrifarm-user';
 import { trpc } from '@/main';
 
 /**
@@ -28,8 +29,9 @@ export const useIdentifyPostHog = () => {
 				return;
 			}
 			wasConnectedRef.current = true;
+			const deliverableEmail = getDeliverableEmail(user.email);
 			posthog.identify(user.id, {
-				email_domain: user.email.split('@').at(1),
+				...(deliverableEmail && { email_domain: deliverableEmail.split('@').at(1) }),
 				name: user.name,
 				project_id: project.id,
 			});

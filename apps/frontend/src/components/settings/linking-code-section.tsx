@@ -4,6 +4,7 @@ import { Check, Copy, Loader2, RefreshCcw, Unlink } from 'lucide-react';
 import { SettingsCard } from '../ui/settings-card';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/lib/auth-client';
+import { getAccountDisplayLabel } from '@/lib/irrifarm-user';
 import { trpc } from '@/main';
 
 type MessagingProvider = 'whatsapp' | 'telegram';
@@ -107,7 +108,9 @@ export function LinkingCodesCard({ provider }: LinkingCodesCardProps) {
 				<div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center'>
 					<div className='min-w-0'>
 						<p className='text-xs text-muted-foreground'>Email</p>
-						<p className='text-sm font-medium text-foreground truncate'>{user?.email ?? 'Loading...'}</p>
+						<p className='text-sm font-medium text-foreground truncate'>
+							{getAccountDisplayLabel(user?.email) ?? 'Loading...'}
+						</p>
 					</div>
 					<div className='min-w-0 sm:justify-self-end'>
 						<p className='text-xs text-muted-foreground'>Code</p>

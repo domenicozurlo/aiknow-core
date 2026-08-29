@@ -19,11 +19,17 @@ load_dotenv()
 cli_path = Path(__file__).resolve().parent.parent.parent.parent / "cli"
 sys.path.insert(0, str(cli_path))
 
-from irrifarm_scope import IrrifarmScopeError, apply_irrifarm_scope  # noqa: E402
+from irrifarm_scope import (  # noqa: E402
+    IrrifarmScopeError,
+    apply_irrifarm_query_guardrails,
+    apply_irrifarm_scope,
+)
 from nao_core.config import NaoConfig, NaoConfigError  # noqa: E402
 from nao_core.context import get_context_provider  # noqa: E402
 
 port = int(os.environ.get("PORT", 8005))
+irrifarm_max_query_rows = int(os.environ.get("IRRIFARM_MAX_QUERY_ROWS", 500))
+irrifarm_query_timeout_ms = int(os.environ.get("IRRIFARM_QUERY_TIMEOUT_MS", 30_000))
 
 # Global scheduler instance
 scheduler = None
@@ -106,6 +112,7 @@ class ExecuteSQLResponse(BaseModel):
     row_count: int
     columns: list[str]
     dialect: str | None = None
+    applied_limit: int | None = None
 
 
 class RefreshResponse(BaseModel):
@@ -265,10 +272,17 @@ async def execute_sql(request: ExecuteSQLRequest):
             )
 
         scoped_sql = request.sql
+        applied_limit = None
         if request.allowed_mbo_sns is not None:
             try:
                 scoped_sql = apply_irrifarm_scope(
                     request.sql, request.allowed_mbo_sns, db_config.type
+                )
+                scoped_sql, applied_limit = apply_irrifarm_query_guardrails(
+                    scoped_sql,
+                    db_config.type,
+                    irrifarm_max_query_rows,
+                    irrifarm_query_timeout_ms,
                 )
             except IrrifarmScopeError as error:
                 raise HTTPException(status_code=403, detail=str(error)) from error
@@ -301,6 +315,7 @@ async def execute_sql(request: ExecuteSQLRequest):
             row_count=len(data),
             columns=[str(c) for c in df.columns.tolist()],
             dialect=db_config.type,
+            applied_limit=applied_limit,
         )
     except HTTPException:
         raise

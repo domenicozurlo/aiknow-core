@@ -99,6 +99,14 @@ const envSchema = z.object({
 	IRRIFARM_AUTH_MODE: z.enum(['disabled', 'fixture', 'check-user']).default('disabled'),
 	IRRIFARM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
 	IRRIFARM_APP_ORIGINS: z.string().optional(),
+	IRRIFARM_TEST_PAGE_ENABLED: z
+		.enum(['true', 'false'])
+		.optional()
+		.default('false')
+		.transform((val) => val === 'true'),
+	IRRIFARM_LARGE_SCOPE_THRESHOLD: z.coerce.number().int().positive().default(50),
+	IRRIFARM_MAX_QUERY_ROWS: z.coerce.number().int().positive().max(10_000).default(500),
+	IRRIFARM_QUERY_TIMEOUT_MS: z.coerce.number().int().positive().max(300_000).default(30_000),
 	IRRIFARM_FIXTURE_USERNAME: z.string().optional(),
 	IRRIFARM_FIXTURE_USER_ID: z.coerce.number().int().positive().optional(),
 	IRRIFARM_FIXTURE_CLIENT_ID: z.coerce.number().int().positive().optional(),

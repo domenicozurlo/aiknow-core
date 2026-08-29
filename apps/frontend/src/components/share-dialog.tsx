@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { getAccountDisplayLabel } from '@/lib/irrifarm-user';
 import { cn } from '@/lib/utils';
 
 export function ShareLoadingDialog({
@@ -278,7 +279,7 @@ export function MemberPicker({
 						<MemberRow
 							key={member.id}
 							name={member.name}
-							email={member.email}
+							email={getAccountDisplayLabel(member.email) ?? member.name}
 							selected={selectedUserIds.has(member.id)}
 							onClick={() => onToggleUser(member.id)}
 						/>

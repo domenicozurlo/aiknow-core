@@ -28,6 +28,7 @@ import { createWebSearchTools } from '../agents/tools/web-search';
 import { getConnections, getTableColumnsContent, getUserRules } from '../agents/user-rules';
 import { ChatForkContextPrompt, MessagingProviderSystemPrompt, SystemPrompt } from '../components/ai';
 import { DBChat } from '../db/abstractSchema';
+import { env } from '../env';
 import { renderToMarkdown } from '../lib/markdown';
 import * as chatQueries from '../queries/chat.queries';
 import * as imageQueries from '../queries/image.queries';
@@ -574,7 +575,9 @@ class AgentManager {
 
 		const baseSystemPrompt =
 			this._systemPromptOverride ?? (await this._buildSystemPrompt(provider, timezone, chatUrl));
-		const systemPrompt = appendIrrifarmAuthorizationContext(baseSystemPrompt, this._toolContext.allowedMboSns);
+		const systemPrompt = appendIrrifarmAuthorizationContext(baseSystemPrompt, this._toolContext.allowedMboSns, {
+			largeScopeThreshold: env.IRRIFARM_LARGE_SCOPE_THRESHOLD,
+		});
 
 		const systemMessage: Omit<UIMessage, 'id'> = {
 			role: 'system',

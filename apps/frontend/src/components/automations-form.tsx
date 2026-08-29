@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { useSession } from '@/lib/auth-client';
+import { getDeliverableEmail } from '@/lib/irrifarm-user';
 import { trpc } from '@/main';
 
 type IntegrationConfig = {
@@ -316,7 +317,7 @@ function useAutomationFormController({
 	const availableModels = useQuery(trpc.project.listAvailableTranscribeModels.queryOptions());
 	const mcpServersQuery = useQuery(trpc.mcp.getServers.queryOptions());
 	const isDirty = !areAutomationValuesEqual(value, savedValue);
-	const userEmail = session?.user?.email;
+	const userEmail = getDeliverableEmail(session?.user?.email);
 	const selectedModelValue =
 		value.modelProvider && value.modelId ? `${value.modelProvider}:${value.modelId}` : defaultModelValue;
 	const selectedModelName =

@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowLeft, SlidersVertical } from 'lucide-react';
 import { Avatar } from './ui/avatar';
 import { useSession } from '@/lib/auth-client';
+import { getAccountDisplayLabel } from '@/lib/irrifarm-user';
 import { cn, hideIf } from '@/lib/utils';
 
 interface SidebarUserMenuProps {
@@ -12,7 +13,7 @@ interface SidebarUserMenuProps {
 export function SidebarUserMenu({ isCollapsed, isInSettings }: SidebarUserMenuProps) {
 	const { data: session } = useSession();
 	const username = session?.user?.name;
-	const email = session?.user?.email;
+	const accountLabel = getAccountDisplayLabel(session?.user?.email);
 
 	return (
 		<div className='flex flex-col gap-3'>
@@ -38,7 +39,7 @@ export function SidebarUserMenu({ isCollapsed, isInSettings }: SidebarUserMenuPr
 							)}
 						>
 							<span className='text-sm leading-4 font-medium truncate'>{username}</span>
-							<span className='text-xs text-muted-foreground truncate'>{email}</span>
+							<span className='text-xs text-muted-foreground truncate'>{accountLabel}</span>
 						</span>
 					</div>
 				</Link>

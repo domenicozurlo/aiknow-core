@@ -1,14 +1,18 @@
-export function appendIrrifarmAuthorizationContext(prompt: string, allowedMboSns: string[] | null): string {
+export function appendIrrifarmAuthorizationContext(
+	prompt: string,
+	allowedMboSns: string[] | null,
+	options: { largeScopeThreshold?: number } = {},
+): string {
 	if (allowedMboSns === null) {
 		return prompt;
 	}
 
 	const serials = [...new Set(allowedMboSns)];
-	const scopeInstructions = buildScopeInstructions(serials);
+	const scopeInstructions = buildScopeInstructions(serials, options.largeScopeThreshold ?? 50);
 	return `${prompt}\n\n## Irrifarm authorization scope\n\n${scopeInstructions}`;
 }
 
-function buildScopeInstructions(serials: string[]): string {
+function buildScopeInstructions(serials: string[], largeScopeThreshold: number): string {
 	const commonInstructions =
 		'The SQL executor enforces this authorization scope server-side. Never request, infer, or use an MBO outside it.';
 
@@ -24,10 +28,22 @@ function buildScopeInstructions(serials: string[]): string {
 		].join(' ');
 	}
 
+	if (serials.length > largeScopeThreshold) {
+		return [
+			`The authenticated Irrifarm user has a large authorization scope of ${serials.length} MBO serials.`,
+			'Interpret "my control units" and "of my competence" as the complete authorized set, but do not retrieve or enumerate every motherboard unless the user explicitly requests a full export.',
+			'For inventory questions, start with COUNT(*) and grouped summaries. For discovery or selection, query at most 50 aliases/serials at a time and ask the user for an alias, customer, status, or other narrowing criterion.',
+			'For telemetry or history tables such as senshistory, always use a bounded time interval and aggregate in SQL. If the user did not provide a time interval, ask for one before querying.',
+			'When the request requires exactly one control unit, retrieve a small scoped set of matching aliases and serials, then ask the user to choose. Never load the complete MBO list merely to count it.',
+			commonInstructions,
+		].join(' ');
+	}
+
 	return [
 		`The authenticated Irrifarm user has ${serials.length} authorized MBO serials.`,
 		'Interpret expressions such as "my control units" or "of my competence" as the complete authorized set. Do not ask for a serial when the request can be run across that set; execute the query and let the SQL executor apply the scope.',
-		'Ask which MBO only when the task genuinely requires exactly one control unit.',
+		'A singular expression such as "my control unit" is ambiguous when the task requires data for exactly one control unit.',
+		'In that case, first retrieve the scoped list of authorized motherboards and their aliases from the available project context or SQL, then ask the user to choose from those options. Do not ask the user to provide an opaque serial without presenting the authorized choices.',
 		commonInstructions,
 	].join(' ');
 }
