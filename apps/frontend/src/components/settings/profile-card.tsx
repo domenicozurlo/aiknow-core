@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 
 interface UserProfileCardProps {
 	name?: string;
-	email?: string;
+	subtitle?: string;
 	onEdit: () => void;
 	onSignOut: () => void;
 }
 
-export function UserProfileCard({ name, email, onEdit, onSignOut }: UserProfileCardProps) {
+export function UserProfileCard({ name, subtitle, onEdit, onSignOut }: UserProfileCardProps) {
 	return (
 		<SettingsCard
 			title='Account'
@@ -22,7 +22,7 @@ export function UserProfileCard({ name, email, onEdit, onSignOut }: UserProfileC
 				{name && <Avatar username={name} size='xl' />}
 				<div className='text-left'>
 					<h2 className='text-lg font-medium text-foreground'>{name}</h2>
-					<p className='text-sm text-muted-foreground'>{email}</p>
+					{subtitle && <p className='text-sm text-muted-foreground'>{subtitle}</p>}
 				</div>
 			</div>
 

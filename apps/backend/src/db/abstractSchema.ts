@@ -15,6 +15,9 @@ export type NewUserPreference = typeof sqliteSchema.userPreference.$inferInsert;
 export type NewAccount = typeof sqliteSchema.account.$inferInsert;
 export type Account = typeof sqliteSchema.account.$inferSelect;
 
+export type DBIrrifarmIdentity = typeof sqliteSchema.irrifarmIdentity.$inferSelect;
+export type NewIrrifarmIdentity = typeof sqliteSchema.irrifarmIdentity.$inferInsert;
+
 export type NewChat = typeof sqliteSchema.chat.$inferInsert;
 export type DBChat = typeof sqliteSchema.chat.$inferSelect;
 

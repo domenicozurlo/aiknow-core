@@ -77,6 +77,7 @@ export const testRoutes = async (app: App) => {
 							agentSettings: null,
 							envVars: {},
 							azureAccessToken: null,
+							allowedMboSns: null,
 							queryResults: new Map(),
 							generatedArtifacts: { charts: [], maps: [], stories: [] },
 						},

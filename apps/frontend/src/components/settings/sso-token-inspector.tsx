@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SettingsCard } from '@/components/ui/settings-card';
 import { useSession } from '@/lib/auth-client';
+import { getAccountDisplayLabel } from '@/lib/irrifarm-user';
 import { trpc } from '@/main';
 
 type Inspection = NonNullable<ReturnType<typeof useInspection>['data']>;
@@ -51,7 +52,7 @@ export function SsoTokenInspector() {
 					<SelectContent>
 						{(members.data ?? []).map((member) => (
 							<SelectItem key={member.id} value={member.id}>
-								{member.email}
+								{getAccountDisplayLabel(member.email)}
 							</SelectItem>
 						))}
 					</SelectContent>

@@ -9,6 +9,7 @@ import { EditMemberDialog } from '@/components/settings/team';
 import { ProviderConnectionCard } from '@/components/settings/provider-connection-card';
 import { NewsletterSubscribeInlineForm } from '@/components/newsletter-subscribe';
 import { signOut, useSession } from '@/lib/auth-client';
+import { getAccountDisplayLabel, getDeliverableEmail } from '@/lib/irrifarm-user';
 import { SettingsVersionInfo } from '@/components/settings/version-info';
 import { useAuthRoute } from '@/hooks/use-auth-route';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -31,6 +32,8 @@ function GeneralPage() {
 	const navigate = useNavigate();
 	const { data: session, refetch } = useSession();
 	const user = session?.user;
+	const accountLabel = getAccountDisplayLabel(user?.email);
+	const deliverableEmail = getDeliverableEmail(user?.email);
 	const queryClient = useQueryClient();
 	const { isAdmin, isViewer, role } = usePermissions();
 	const [soundEnabled, setSoundEnabled] = useLocalStorage(soundNotificationStorage);
@@ -91,7 +94,7 @@ function GeneralPage() {
 		<SettingsPageWrapper>
 			<UserProfileCard
 				name={user?.name}
-				email={user?.email}
+				subtitle={accountLabel}
 				onEdit={() => setEditOpen(true)}
 				onSignOut={handleSignOut}
 			/>
@@ -121,7 +124,7 @@ function GeneralPage() {
 				<SettingsControlRow
 					label='Newsletter'
 					description='Get product updates, release notes, and analytics agent tips.'
-					control={<NewsletterSubscribeInlineForm initialEmail={user?.email} />}
+					control={<NewsletterSubscribeInlineForm initialEmail={deliverableEmail} />}
 				/>
 			</SettingsCard>
 

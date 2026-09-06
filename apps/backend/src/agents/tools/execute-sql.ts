@@ -51,19 +51,31 @@ export async function executeQuery(
 
 	const naoProjectFolder = context.projectFolder;
 	const envVars = context.envVars;
-	const response = await fetch(`http://localhost:${env.FASTAPI_PORT}/execute_sql`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify({
-			sql: effectiveSql,
-			nao_project_folder: naoProjectFolder,
-			...(database_id && { database_id }),
-			...(Object.keys(envVars).length > 0 && { env_vars: envVars }),
-			...(context.azureAccessToken && { azure_access_token: context.azureAccessToken }),
-		}),
-	});
+	let response: Response;
+	try {
+		response = await fetch(`http://localhost:${env.FASTAPI_PORT}/execute_sql`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				sql: effectiveSql,
+				nao_project_folder: naoProjectFolder,
+				...(context.allowedMboSns !== null && { allowed_mbo_sns: context.allowedMboSns }),
+				...(database_id && { database_id }),
+				...(Object.keys(envVars).length > 0 && { env_vars: envVars }),
+				...(context.azureAccessToken && { azure_access_token: context.azureAccessToken }),
+			}),
+			...(context.allowedMboSns !== null && { signal: AbortSignal.timeout(env.IRRIFARM_QUERY_TIMEOUT_MS) }),
+		});
+	} catch (error) {
+		if (isTimeoutError(error)) {
+			throw new Error(
+				`Irrifarm SQL query exceeded ${env.IRRIFARM_QUERY_TIMEOUT_MS} ms. Narrow the MBO selection or time interval and retry.`,
+			);
+		}
+		throw error;
+	}
 
 	if (!response.ok) {
 		const errorData = await response.json().catch(() => ({ detail: response.statusText }));
@@ -75,7 +87,14 @@ export async function executeQuery(
 
 	context.queryResults.set(id, { columns: data.columns, data: data.data });
 
-	const appliedLimit = detectQueryRowLimit(effectiveSql);
+	const requestedLimit = detectQueryRowLimit(effectiveSql);
+	const enforcedLimit = typeof data.applied_limit === 'number' ? data.applied_limit : null;
+	const appliedLimit =
+		requestedLimit === null
+			? enforcedLimit
+			: enforcedLimit === null
+				? requestedLimit
+				: Math.min(requestedLimit, enforcedLimit);
 
 	return withTemplateWarnings(
 		{
@@ -139,6 +158,10 @@ function withTemplateWarnings(output: executeSql.Output, templateWarnings: strin
 		return output;
 	}
 	return { ...output, template_warnings: templateWarnings };
+}
+
+function isTimeoutError(error: unknown): boolean {
+	return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
 }
 
 async function updateExistingQuery(

@@ -144,6 +144,28 @@ export const account = sqliteTable(
 	(table) => [index('account_userId_idx').on(table.userId)],
 );
 
+export const irrifarmIdentity = sqliteTable(
+	'irrifarm_identity',
+	{
+		userId: text('user_id')
+			.primaryKey()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		irrifarmUserId: integer('irrifarm_user_id').notNull().unique(),
+		username: text('username').notNull(),
+		clientId: integer('client_id').notNull(),
+		clientLevel: integer('client_level').notNull(),
+		userRole: text('user_role'),
+		regId: text('reg_id'),
+		mboSns: text('mbo_sns', { mode: 'json' }).$type<string[]>().notNull().default([]),
+		lastValidatedAt: integer('last_validated_at', { mode: 'timestamp_ms' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.$onUpdate(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	},
+	(table) => [index('irrifarm_identity_username_idx').on(table.username)],
+);
+
 export const verification = sqliteTable(
 	'verification',
 	{

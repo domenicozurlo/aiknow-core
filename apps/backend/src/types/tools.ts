@@ -28,6 +28,11 @@ export interface ToolContext {
 	 */
 	azureAccessToken: string | null;
 	/**
+	 * Motherboard serials granted by an Irrifarm login. Null means this is not
+	 * an Irrifarm identity; an empty array means the identity has no MBO access.
+	 */
+	allowedMboSns: string[] | null;
+	/**
 	 * In-memory cache for query results within a single agent run.
 	 * For queries from earlier turns in the same chat, prefer
 	 * `services/query-result.service#getQueryResult`, which falls back

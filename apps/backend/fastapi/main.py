@@ -19,10 +19,17 @@ load_dotenv()
 cli_path = Path(__file__).resolve().parent.parent.parent.parent / "cli"
 sys.path.insert(0, str(cli_path))
 
-from nao_core.config import NaoConfig, NaoConfigError
-from nao_core.context import get_context_provider
+from irrifarm_scope import (  # noqa: E402
+    IrrifarmScopeError,
+    apply_irrifarm_query_guardrails,
+    apply_irrifarm_scope,
+)
+from nao_core.config import NaoConfig, NaoConfigError  # noqa: E402
+from nao_core.context import get_context_provider  # noqa: E402
 
 port = int(os.environ.get("PORT", 8005))
+irrifarm_max_query_rows = int(os.environ.get("IRRIFARM_MAX_QUERY_ROWS", 500))
+irrifarm_query_timeout_ms = int(os.environ.get("IRRIFARM_QUERY_TIMEOUT_MS", 30_000))
 
 # Global scheduler instance
 scheduler = None
@@ -97,6 +104,7 @@ class ExecuteSQLRequest(BaseModel):
     database_id: str | None = None
     env_vars: dict[str, str] | None = None
     azure_access_token: str | None = None
+    allowed_mbo_sns: list[str] | None = None
 
 
 class ExecuteSQLResponse(BaseModel):
@@ -104,6 +112,7 @@ class ExecuteSQLResponse(BaseModel):
     row_count: int
     columns: list[str]
     dialect: str | None = None
+    applied_limit: int | None = None
 
 
 class RefreshResponse(BaseModel):
@@ -262,6 +271,22 @@ async def execute_sql(request: ExecuteSQLRequest):
                 },
             )
 
+        scoped_sql = request.sql
+        applied_limit = None
+        if request.allowed_mbo_sns is not None:
+            try:
+                scoped_sql = apply_irrifarm_scope(
+                    request.sql, request.allowed_mbo_sns, db_config.type
+                )
+                scoped_sql, applied_limit = apply_irrifarm_query_guardrails(
+                    scoped_sql,
+                    db_config.type,
+                    irrifarm_max_query_rows,
+                    irrifarm_query_timeout_ms,
+                )
+            except IrrifarmScopeError as error:
+                raise HTTPException(status_code=403, detail=str(error)) from error
+
         auth_mode_value = getattr(getattr(db_config, "auth_mode", None), "value", None)
 
         if auth_mode_value == "azure_entra_id":
@@ -275,10 +300,10 @@ async def execute_sql(request: ExecuteSQLRequest):
                     ),
                 )
             df = db_config.execute_sql_with_token(
-                request.sql, request.azure_access_token
+                scoped_sql, request.azure_access_token
             )
         else:
-            df = db_config.execute_sql(request.sql)
+            df = db_config.execute_sql(scoped_sql)
 
         data = [
             {k: _convert_value(v) for k, v in row.items()}
@@ -290,6 +315,7 @@ async def execute_sql(request: ExecuteSQLRequest):
             row_count=len(data),
             columns=[str(c) for c in df.columns.tolist()],
             dialect=db_config.type,
+            applied_limit=applied_limit,
         )
     except HTTPException:
         raise
