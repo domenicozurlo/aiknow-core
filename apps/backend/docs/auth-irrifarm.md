@@ -2,6 +2,8 @@
 
 This integration lets an authenticated Irrifarm user open nao without seeing nao's login page. It does not change or replace Irrifarm's existing username/password login.
 
+For the current dev deployment checklist and smoke procedure, see [auth-irrifarm-dev.md](./auth-irrifarm-dev.md).
+
 ## Browser hand-off
 
 The Irrifarm backend obtains an Irrifarm app JWT and returns an auto-submitting form to the browser. Passwords must never be sent to nao.
