@@ -19,11 +19,18 @@ load_dotenv()
 cli_path = Path(__file__).resolve().parent.parent.parent.parent / "cli"
 sys.path.insert(0, str(cli_path))
 
-from irrifarm_scope import (  # noqa: E402
-    IrrifarmScopeError,
-    apply_irrifarm_query_guardrails,
-    apply_irrifarm_scope,
-)
+if __package__:
+    from .irrifarm_scope import (  # noqa: E402
+        IrrifarmScopeError,
+        apply_irrifarm_query_guardrails,
+        apply_irrifarm_scope,
+    )
+else:
+    from irrifarm_scope import (  # noqa: E402
+        IrrifarmScopeError,
+        apply_irrifarm_query_guardrails,
+        apply_irrifarm_scope,
+    )
 from nao_core.config import NaoConfig, NaoConfigError  # noqa: E402
 from nao_core.context import get_context_provider  # noqa: E402
 
