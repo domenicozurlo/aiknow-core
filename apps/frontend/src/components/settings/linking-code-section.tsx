@@ -7,13 +7,19 @@ import { useSession } from '@/lib/auth-client';
 import { getAccountDisplayLabel } from '@/lib/irrifarm-user';
 import { trpc } from '@/main';
 
-type MessagingProvider = 'whatsapp' | 'telegram';
+type MessagingProvider = 'mattermost' | 'telegram' | 'whatsapp';
 
 interface LinkingCodesCardProps {
 	provider: MessagingProvider;
 }
 
 const PROVIDER_LABELS: Record<MessagingProvider, { name: string; loginHint: string; setupHint: string }> = {
+	mattermost: {
+		name: 'Mattermost',
+		loginHint:
+			'Accounts link automatically by email. If your Mattermost admin hides email addresses, send `login <code>` to the bot.',
+		setupHint: 'An admin still needs to finish the Mattermost bot setup.',
+	},
 	whatsapp: {
 		name: 'WhatsApp',
 		loginHint: 'Send `/login <code>` from the WhatsApp number you want to link.',
@@ -40,6 +46,10 @@ export function LinkingCodesCard({ provider }: LinkingCodesCardProps) {
 		...trpc.project.getTelegramConfig.queryOptions(),
 		enabled: provider === 'telegram',
 	});
+	const mattermostConfig = useQuery({
+		...trpc.project.getMattermostConfig.queryOptions(),
+		enabled: provider === 'mattermost',
+	});
 	const currentCode = useQuery(trpc.project.getCurrentUserMessagingProviderCode.queryOptions());
 	const linkedAccounts = useQuery({
 		...trpc.project.getCurrentUserWhatsappLinks.queryOptions(),
@@ -48,7 +58,8 @@ export function LinkingCodesCard({ provider }: LinkingCodesCardProps) {
 	const regenerateCode = useMutation(trpc.project.regenerateCurrentUserMessagingProviderCode.mutationOptions());
 	const unlinkWhatsapp = useMutation(trpc.project.unlinkCurrentUserWhatsappLink.mutationOptions());
 
-	const configQuery = provider === 'whatsapp' ? whatsappConfig : telegramConfig;
+	const configQuery =
+		provider === 'whatsapp' ? whatsappConfig : provider === 'telegram' ? telegramConfig : mattermostConfig;
 	const isConfigured = Boolean(configQuery.data?.projectConfig);
 	const code = currentCode.data ?? '';
 	const [copied, setCopied] = useState(false);

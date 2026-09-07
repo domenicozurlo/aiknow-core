@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import type { Stats } from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -153,7 +154,7 @@ async function resolveAssetPath(
 	localPath: string,
 	sourceFilePath: string,
 	projectFolder: string,
-): Promise<{ realPath: string; stat: Awaited<ReturnType<typeof fs.stat>> } | null> {
+): Promise<{ realPath: string; stat: Stats } | null> {
 	const candidates = [
 		resolveAssetVirtualPath(localPath, sourceFilePath),
 		localPath.startsWith('/') ? path.posix.normalize(localPath) : path.posix.normalize(`/${localPath}`),

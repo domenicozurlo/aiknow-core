@@ -28,5 +28,11 @@ apps/backend/storage/
 .nao/
 nao_irriai_context_deploy_key
 nao_irriai_context_deploy_key.pub
+.meta/
 
 example/tests/outputs/
+
+# heal.dev related stuff
+.heal/
+apps/frontend/.playwright*
+sandbox/
