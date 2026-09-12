@@ -67,7 +67,8 @@ RUN if [ -n "$NAO_CLI_VERSION" ]; then \
     fi
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system '.[mysql]'
+    uv pip install --system '.[mysql]' \
+    && python -c "import importlib.metadata as metadata; import ibis.backends.mysql; import MySQLdb; print('MySQL Python dependencies installed:', 'ibis-framework', metadata.version('ibis-framework'), 'mysqlclient', metadata.version('mysqlclient'))"
 
 # =============================================================================
 # STAGE 5: Runtime image
@@ -116,6 +117,12 @@ COPY --from=python-builder --chown=nao:nao /usr/local/lib/python3.12/site-packag
 COPY --from=python-builder --chown=nao:nao /usr/local/bin/nao /usr/local/bin/nao
 COPY --from=deps --chown=nao:nao /app/package.json ./
 COPY --from=deps --chown=nao:nao /app/node_modules ./node_modules
+
+# Verify the compiled MySQL driver again in the final image. This catches
+# missing runtime shared libraries (for example libmariadb.so) during the
+# Docker build instead of surfacing a misleading "extra not installed" error
+# only after deployment.
+RUN python -c "import importlib.metadata as metadata; import ibis.backends.mysql; import MySQLdb; print('MySQL runtime ready:', 'ibis-framework', metadata.version('ibis-framework'), 'mysqlclient', metadata.version('mysqlclient'))"
 
 # Queries against the local DuckDB run with external access off, so extensions have to be on disk
 # before the first query rather than fetched on demand.

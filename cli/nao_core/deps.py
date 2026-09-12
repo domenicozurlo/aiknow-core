@@ -68,9 +68,10 @@ _PROVIDER_ALIASES: dict[str, str] = {
 class MissingDependencyError(ImportError):
     """Raised when an optional dependency is not installed."""
 
-    def __init__(self, package: str, extra: str, purpose: str = ""):
+    def __init__(self, package: str, extra: str, purpose: str = "", *, reason: str | None = None):
         self.package = package
         self.extra = extra
+        self.reason = reason
         pip_cmd = f"pip install 'nao-core[{extra}]'"
         uv_cmd = f"uv pip install 'nao-core[{extra}]'"
         message = (
@@ -80,6 +81,8 @@ class MissingDependencyError(ImportError):
             f"or:\n"
             f"  {uv_cmd}"
         )
+        if reason:
+            message += f"\nUnderlying import error: {reason}"
         super().__init__(message)
 
 
@@ -87,8 +90,8 @@ def require_dependency(package: str, extra: str, purpose: str = "") -> None:
     """Verify that *package* is importable, raising a helpful error if not."""
     try:
         importlib.import_module(package)
-    except ImportError:
-        raise MissingDependencyError(package, extra, purpose) from None
+    except ImportError as error:
+        raise MissingDependencyError(package, extra, purpose, reason=str(error)) from error
 
 
 def require_database_backend(backend: str, *, extra: str | None = None, database_type: str | None = None) -> None:
@@ -97,12 +100,13 @@ def require_database_backend(backend: str, *, extra: str | None = None, database
     display_type = database_type or backend
     try:
         importlib.import_module(f"ibis.backends.{backend}")
-    except (ImportError, ModuleNotFoundError):
+    except (ImportError, ModuleNotFoundError) as error:
         raise MissingDependencyError(
             f"ibis-framework[{backend}]",
             install_extra,
             f"to connect to {display_type} databases",
-        ) from None
+            reason=str(error),
+        ) from error
 
 
 def get_required_extras(config: NaoConfig) -> list[str]:

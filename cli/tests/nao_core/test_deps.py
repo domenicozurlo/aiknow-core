@@ -17,6 +17,8 @@ def test_require_database_backend_uses_public_extra_for_shared_ibis_backend(monk
     assert "to connect to redshift databases" in message
     assert "pip install 'nao-core[redshift]'" in message
     assert "uv pip install 'nao-core[redshift]'" in message
+    assert "Underlying import error: ibis.backends.postgres" in message
+    assert isinstance(exc_info.value.__cause__, ModuleNotFoundError)
 
 
 def test_missing_dependency_error_keeps_extra_brackets_in_pip_command():
@@ -35,4 +37,7 @@ def test_require_dependency_raises_missing_dependency_with_extra(monkeypatch):
     with pytest.raises(MissingDependencyError) as exc_info:
         require_dependency("anthropic", "anthropic", "for Anthropic LLM provider")
 
-    assert "pip install 'nao-core[anthropic]'" in str(exc_info.value)
+    message = str(exc_info.value)
+    assert "pip install 'nao-core[anthropic]'" in message
+    assert "Underlying import error: anthropic" in message
+    assert isinstance(exc_info.value.__cause__, ImportError)
