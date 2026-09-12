@@ -67,8 +67,8 @@ RUN if [ -n "$NAO_CLI_VERSION" ]; then \
     fi
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system '.[mysql]' \
-    && python -c "import importlib.metadata as metadata; import ibis.backends.mysql; import MySQLdb; print('MySQL Python dependencies installed:', 'ibis-framework', metadata.version('ibis-framework'), 'mysqlclient', metadata.version('mysqlclient'))"
+    uv pip install --system '.[mysql]' 'packaging>=21.3' \
+    && python -c "import importlib.metadata as metadata; import MySQLdb; import ibis.backends.mysql; print('MySQL Python dependencies installed:', 'ibis-framework', metadata.version('ibis-framework'), 'mysqlclient', metadata.version('mysqlclient'), 'packaging', metadata.version('packaging'))"
 
 # =============================================================================
 # STAGE 5: Runtime image
